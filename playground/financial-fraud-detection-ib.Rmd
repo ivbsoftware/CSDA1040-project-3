@@ -1,0 +1,67 @@
+---
+title: "Financial Fraud Detection"
+author: "Igor Baranov"
+date: "February 13, 2019"
+output: pdf_document
+---
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+
+library("ggplot2")
+library("readr")
+library("dplyr")
+library("forcats")
+
+set.seed(777)
+```
+
+```{r eval=FALSE, include=FALSE}
+# Seting directory to current script (works in R Studio only)
+#this.dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+#setwd(this.dir)
+```
+
+# Introduction
+Paysim synthetic dataset is borrowed from Kaggle's [Synthetic Financial Datasets For Fraud Detection](https://www.kaggle.com/ntnu-testimon/paysim1)of mobile money transactions. Each step represents an hour of simulation. This dataset is scaled down 1/4 of the original dataset which is presented in the paper "PaySim: A financial mobile money simulator for fraud detection".
+
+# Preparing data
+## Load and clean 
+The data should be downloaded from Kaggle's [Synthetic Financial Datasets For Fraud Detection](https://www.kaggle.com/ntnu-testimon/paysim1/downloads/PS_20174392719_1491204439457_log.csv/2).
+
+Loading and converting some colimns to factors:
+
+```{r message=FALSE, warning=FALSE}
+if(!file.exists("../data/financial-fraud-detection-ib/dff.Rds")) {
+  dff <- read_csv(file="../data/orig/PS_20174392719_1491204439457_log.csv.zip",col_names = TRUE)
+  
+  dff <- dplyr::tbl_df(dff)
+  dplyr::glimpse(dff)
+  utils::View(dff)
+  
+  
+  dff$type <- as.factor(dff$type)
+  dff$nameOrig <- as.factor(dff$nameOrig)
+  dff$nameDest <- as.factor(dff$nameDest)
+  saveRDS(dff, file = "../data/financial-fraud-detection-ib/dff.Rds")
+  gc()
+} else {
+  dff <- readRDS("../data/financial-fraud-detection-ib/dff.Rds")
+}
+head(dff)
+
+# Feature engineering
+
+## Distribution of number of tranactions by 'nameOrig'
+
+```{r fig.height=7, fig.width=5.5, message=FALSE, warning=FALSE}
+nameOrig_freq_sorted_list <- levels(fct_infreq(dff$nameOrig))
+
+
+ggplot() + aes(dff$nameOrig)+ geom_histogram(binwidth=10, colour="black", fill="white", stat = "count")
+
+ggplot() + aes(fct_infreq(dff[dff$nameOrig %in% nameOrig_freq_sorted_list[1:30],]$nameOrig))+ 
+  geom_histogram(colour="black", fill="white", stat = "count")+
+  ylab("Frequency") + xlab("")+
+  theme(axis.text.x = element_text(angle =90, hjust = 1))
+``````
