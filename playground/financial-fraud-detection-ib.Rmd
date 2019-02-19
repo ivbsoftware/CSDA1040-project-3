@@ -23,7 +23,8 @@ set.seed(777)
 ```
 
 # Introduction
-Paysim synthetic dataset is borrowed from Kaggle's [Synthetic Financial Datasets For Fraud Detection](https://www.kaggle.com/ntnu-testimon/paysim1)of mobile money transactions. Each step represents an hour of simulation. This dataset is scaled down 1/4 of the original dataset which is presented in the paper "PaySim: A financial mobile money simulator for fraud detection".
+\citep{R} 
+This template Paysim synthetic dataset is borrowed from Kaggle's [Synthetic Financial Datasets For Fraud Detection](https://www.kaggle.com/ntnu-testimon/paysim1)of mobile money transactions. Each step represents an hour of simulation. This dataset is scaled down 1/4 of the original dataset which is presented in the paper "PaySim: A financial mobile money simulator for fraud detection".
 
 # Preparing data
 ## Load and clean 
@@ -48,20 +49,31 @@ if(!file.exists("../data/financial-fraud-detection-ib/dff.Rds")) {
 } else {
   dff <- readRDS("../data/financial-fraud-detection-ib/dff.Rds")
 }
-head(dff)
-
+head(dff, 50)
+```
 # Feature engineering
 
-## Distribution of number of tranactions by 'nameOrig'
-
+## Distribution of number of transactions by 'nameOrig'
 ```{r fig.height=7, fig.width=5.5, message=FALSE, warning=FALSE}
-nameOrig_freq_sorted_list <- levels(fct_infreq(dff$nameOrig))
+nameOrig_freq_table <- table(fct_infreq(dff$nameOrig))
+head(nameOrig_freq_table)
+```
+## Distribution of number of fraud transactions by 'nameOrig'
+```{r fig.height=7, fig.width=5.5, message=FALSE, warning=FALSE}
+nameOrig_freq_table_fraud <- table(fct_infreq(dff$nameOrig[dff$isFraud == 1]))
+head(nameOrig_freq_table_fraud)
+```
 
+## Distribution of number of transactions by 'nameDest'
+```{r fig.height=7, fig.width=5.5, message=FALSE, warning=FALSE}
+nameDest_freq_table <- table(fct_infreq(dff$nameDest))
+head(nameDest_freq_table)
+``` 
 
-ggplot() + aes(dff$nameOrig)+ geom_histogram(binwidth=10, colour="black", fill="white", stat = "count")
-
-ggplot() + aes(fct_infreq(dff[dff$nameOrig %in% nameOrig_freq_sorted_list[1:30],]$nameOrig))+ 
-  geom_histogram(colour="black", fill="white", stat = "count")+
-  ylab("Frequency") + xlab("")+
-  theme(axis.text.x = element_text(angle =90, hjust = 1))
+## Distribution of number of fraud transactions by 'nameDest'
+```{r fig.height=7, fig.width=5.5, message=FALSE, warning=FALSE}
+nameDest_freq_table_fraud <- table(fct_infreq(dff$nameDest[dff$isFraud == 1]))
+head(nameDest_freq_table_fraud)
 ``````
+\newp
+\bibliography{RJreferences}
