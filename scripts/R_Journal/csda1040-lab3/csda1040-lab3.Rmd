@@ -21,24 +21,50 @@ figsintext        : no
 
 # Introduction
 
+\citep{R} 
+
 ## Background
 ## Objective
 ## Plan
 ## Ethical ML Framework
-As the goal of this application is only to recommend jokes, many aspects of the ethical ML framework do not directly apply. The data is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that is under represented in this ratings dataset - we assume a low income population (limited access to internet, limited time to be spent rating jokes, etc). This will potentially reduce the reccomender's accuracy for that group of the population. If the outcome of this system were to be of more social impact, this would need to be corrected with appropriate data collection methods.
+As the goal of this application is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The data is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that is under represented in this ratings dataset - we assume a low income population (limited access to internet, limited time to be spent rating jokes, etc). This will potentially reduce the recommender's accuracy for that group of the population. If the outcome of this system were to be of more social impact, this would need to be corrected with appropriate data collection methods.
 
-# Data understanding
+# Time Series Data understanding
 
 ```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
 set.seed(777)
 library("ggplot2")
 library("readr")
+library("dplyr")
+library("forcats")
+library(zoo)
 ```
 
 ```{r eval=FALSE, include=FALSE}
 # Set directory to current script (works in R Studio only)
 this.dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(this.dir)
+```
+
+## Dataset 0
+[Historical stock data for all current S&P 500 companies](https://www.kaggle.com/camnugent/sandp500)
+
+```{r}
+stocks5 <- read_csv(file="../../../data/all_stocks_5yr.csv.zip",col_names = TRUE)
+stocks5$Name <- as.factor(stocks5$Name)
+
+# get stocks for AAL only
+stocks5_aal <- stocks5[stocks5$Name=="AAL",c(1:6)]
+
+require(xts)
+stocks5_aal_xts <- xts(stocks5_aal$close,stocks5_aal$date, frequency = 7)
+frequency(stocks5_aal_xts)
+plot(stocks5_aal_xts)
+
+w <- stocks5_aal_xts[endpoints(stocks5_aal_xts, "quarters")]
+m <- decompose(ts(w, frequency = 4))
+m$figure
+plot(m)
 ```
 
 ## Dataset 1
@@ -48,20 +74,126 @@ Yahoo Science labeled time series. This set is big, it should be downloaded and 
 ## Dataset 2
 NAB Data Corpus: better just load from github directly to R script. [NAB Data Corpus](https://github.com/numenta/NAB/tree/master/data)
 
+
+```{r}
+tt1 <- read_csv(file="../../../data/NAB_data/realTraffic/TravelTime_387.csv",col_names = TRUE)
+
+require(xts)
+tt1_xts <- xts(tt1$value,tt1$timestamp)
+plot(tt1_xts)
+w <- tt1_xts[endpoints(tt1_xts, "days")]
+m <- decompose(ts(w, frequency = 7))
+plot(m$figure)
+plot(m)
+
+f <- decompose(apply.weekly(tt1_xts))
+f$figure
+
+
+## example taken from Kendall/Stuart
+x <- c(-50, 175, 149, 214, 247, 237, 225, 329, 729, 809,
+       530, 489, 540, 457, 195, 176, 337, 239, 128, 102, 232, 429, 3,
+       98, 43, -141, -77, -13, 125, 361, -45, 184)
+x <- ts(x, start = c(1951, 1), end = c(1958, 4), frequency = 4)
+m <- decompose(x)
+m$figure
+
+plot(m)
+
+```
+
+
 ## Data preparation
 
 ## Load the jokes rating data and do the basic checks
-```{r message=FALSE, warning=FALSE}
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 df <- read_csv(file="../../../data/jesterfinal151cols.csv.zip",col_names = FALSE)
 dim(df)
 ```
 
-# Prepare Shiny App for Deployment
+# Time Series Methods Showcase
+
+## Time series decomposition
+Time series decomposition is to decompose a time series into trend, seasonal, cyclical and irregular components. 
+Frequency represents data which has been sampled at equispaced points in time:
+- frequency=7: a weekly series
+- frequency=12: a monthly series
+- frequency=4: a quarterly series
+
+```{r}
+a <- ts(1:20, frequency = 12, start = c(2011, 3))
+print(a)
+
+str(a)
+attributes(a)
+```
+
+To decompose a time series into components:
+
+- Trend component: long term trend
+- Seasonal component: seasonal variation
+- Cyclical component: repeated but non-periodic fluctuations
+- Irregular component: the residuals
+
+A time series of AirPassengers is used below as an example to demonstrate time series decomposition.
+Data AirPassengers: monthly totals of Box Jenkins international airline passengers, 1949 to 1960. It has 144(=12×12) values
+
+```{r}
+plot(AirPassengers)
+```
+
+Seasonal figures
+```{r}
+f <- decompose(AirPassengers)
+f$figure
+```
+
+Get names of 12 months in English words, label x-axis with month names and then 'las' is set to 2 for vertical label orientation (Fig \ref{fig:ffg1}:
+```{r fig1, fig.width=5.5, fig.cap="Cyclic Time Series Seasonal Component"}
+plot(f$figure, type="b", xaxt="n", xlab="")
+monthNames <- months(ISOdate(2011,1:12,1))
+axis(1, at=1:12, labels=monthNames, las=2)
+```
+
+In the figure \ref{fig:fig2}, the first chart is the original time series, the second is trend, the third shows seasonal factors, and the last chart is the remaining component.
+
+```{r fig2, fig.width=5.5, fig.cap="Cyclic Time Series Components"}
+plot(f)
+```
+
+## Time series forecasting
+
+Time series forecasting is to forecast future events based on known past data. To forecast future events based on known past data For example, to predict the price of a stock based on its past performance. Popular models are:
+
+ - Autoregressive moving average (ARMA)
+ - Autoregressive integrated moving average (ARIMA)
+
+Example below (Fig. \ref{fig:fig3}) shows forecasting using ARIMA model.
+
+```{r fig3, fig.width=5.5, fig.cap="Cyclic Time Series Forecasting with ARIMA model"}
+fit <- arima(AirPassengers, order=c(1,0,0), list(order=c(2,1,0), period=12))
+fore <- predict(fit, n.ahead=24)
+
+# error bounds at 95% confidence level
+U <- fore$pred + 2*fore$se
+L <- fore$pred - 2*fore$se
+
+ts.plot(AirPassengers, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2))
+legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
+       col=c(1,2,4), lty=c(1,1,2), cex=0.5)
+```
+
+
+
+
+# Example of Time-Series Analysis Practical Application 
+
+## Prepare Shiny App for Deployment
 
 ## Saving recommender data objects
 ```{r message=FALSE, warning=FALSE}
-saveRDS(rcmnd_ub, file = "jokeRecommender.Rds")
-saveRDS(jokes, file = "jokes.Rds")
+#saveRDS(rcmnd_ub, file = "jokeRecommender.Rds")
+#saveRDS(jokes, file = "jokes.Rds")
 ```
 
 # Deployment Discussion
