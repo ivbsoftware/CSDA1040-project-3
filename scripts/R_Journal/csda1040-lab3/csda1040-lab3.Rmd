@@ -21,23 +21,33 @@ figsintext        : no
 
 # Introduction
 
-\citep{R} 
+ 
 
 ## Background
+
+The function \strong{ts} for the core package \pkg{stats} \citep{R} is used to create time-series objects. These are vector or matrices with class of "ts" (and additional attributes) which represent data which has been sampled at equispaced points in time. In the matrix case, each column of the matrix data is assumed to contain a single (univariate) time series. Time series must have at least one observation, and although they need not be numeric there is very limited support for non-numeric series.
+
+An xts object from package \CRANpkg{xts} \citep{xts} extends the S3 class \strong{zoo} from the package of the same name \citep{zoo}. Package \CRANpkg{zoo} is the creator for an \strong{S3} class of indexed totally ordered observations which includes irregular time series.
+
+Similar to zoo objects, xts objects must have an ordered index. While zoo indexes cannot contain duplicate values, xts objects have optionally supported duplicate index elements since version 0.5-0. The xts class has one additional requirement, the index must be a time-based class. Currently supported classes include: 'Date', 'POSIXct', 'timeDate', as well as 'yearmon' and 'yearqtr' where the index values remain unique.
+
 ## Objective
 ## Plan
-## Ethical ML Framework
-As the goal of this application is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The data is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that is under represented in this ratings dataset - we assume a low income population (limited access to internet, limited time to be spent rating jokes, etc). This will potentially reduce the recommender's accuracy for that group of the population. If the outcome of this system were to be of more social impact, this would need to be corrected with appropriate data collection methods.
+## Ethical Consideration for the Time Series ML Framework
+As the goal of this report is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The data is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that is under represented in this ratings dataset - we assume a low income population (limited access to internet, limited time to be spent rating jokes, etc). This will potentially reduce the recommender's accuracy for that group of the population. If the outcome of this system were to be of more social impact, this would need to be corrected with appropriate data collection methods.
 
-# Time Series Data understanding
+# Time Series Data Manipulating and Visualizing
 
 ```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
-set.seed(777)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+
 library("ggplot2")
 library("readr")
 library("dplyr")
 library("forcats")
 library(zoo)
+
+set.seed(777)
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -46,26 +56,55 @@ this.dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
 setwd(this.dir)
 ```
 
-## Dataset 0
-[Historical stock data for all current S&P 500 companies](https://www.kaggle.com/camnugent/sandp500)
+## Constructing TS object {#simpleTS}
+
+In the following example (Fig \ref{fig:fig4}) we construct and plot a simple TS class:
+
+```{r}
+simpleTS <- c(-50, 175, 149, 214, 247, 237, 225, 329, 729, 809,
+       530, 489, 540, 457, 195, 176, 337, 239, 128, 102, 232, 429, 3,
+       98, 43, -141, -77, -13, 125, 361, -45, 184)
+simpleTS <- ts(simpleTS, start = c(2001, 1), end = c(2008, 4), frequency = 4)
+print(simpleTS)
+```
+
+```{r fig4, fig.width=5.5, fig.cap="Time Series ts class Example Plot"}
+plot(simpleTS, ylab="", xlab="")
+```
+
+## Loading Stock Data  {#stocks5_aal}
+
+There are many ways to load times data, but the fastest is to use \CRANpkg{zoo} that has many convinient utilities to manipulate times series data. This is especially convinient when dealing with complex stock data.
+
+This is an example of loading and presenting of stock data using [Historical stock data for all current S&P 500 companies](https://www.kaggle.com/camnugent/sandp500). Stock market data can be interesting to analyze and as a further incentive, strong predictive models can have large financial payoff. Data has the following columns: 
+
+ - Date - in format: yy-mm-dd
+ - Open - price of the stock at market open (this is NYSE data so all in USD)
+ - High - Highest price reached in the day
+ - Low Close - Lowest price reached in the day
+ - Volume - Number of shares traded
+ - Name - the stock's ticker name
+
+First we load the whole dataset as data frame:
 
 ```{r}
 stocks5 <- read_csv(file="../../../data/all_stocks_5yr.csv.zip",col_names = TRUE)
 stocks5$Name <- as.factor(stocks5$Name)
-
-# get stocks for AAL only
-stocks5_aal <- stocks5[stocks5$Name=="AAL",c(1:6)]
-
-require(xts)
-stocks5_aal_xts <- xts(stocks5_aal$close,stocks5_aal$date, frequency = 7)
-frequency(stocks5_aal_xts)
-plot(stocks5_aal_xts)
-
-w <- stocks5_aal_xts[endpoints(stocks5_aal_xts, "quarters")]
-m <- decompose(ts(w, frequency = 4))
-m$figure
-plot(m)
+head(stocks5$Name)
 ```
+
+As the name suggests we should have 500 (505 to be correct) stock names in the dataset. The code below extracts stock data of AAL (American Airlines Group Inc), converts it to \strong{zoo} object and plots it as multi-variate time series (Fig \ref{fig:fig5}).
+
+```{r}
+stocks5_aal <- stocks5[stocks5$Name=="AAL",c(1:6)]
+stocks5_aal <- zoo(stocks5_aal[,2:6], stocks5_aal$date)
+str(stocks5_aal)
+```
+
+```{r fig5, fig.width=5.5, fig.height=9, fig.cap="Multi-variate time series visualization of AAL stock"}
+plot(stocks5_aal, xlab = "", nc = 1, main = "")
+```
+
 
 ## Dataset 1
 Yahoo Science labeled time series. This set is big, it should be downloaded and used locally:
@@ -75,7 +114,7 @@ Yahoo Science labeled time series. This set is big, it should be downloaded and 
 NAB Data Corpus: better just load from github directly to R script. [NAB Data Corpus](https://github.com/numenta/NAB/tree/master/data)
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 tt1 <- read_csv(file="../../../data/NAB_data/realTraffic/TravelTime_387.csv",col_names = TRUE)
 
 require(xts)
@@ -89,26 +128,6 @@ plot(m)
 f <- decompose(apply.weekly(tt1_xts))
 f$figure
 
-
-## example taken from Kendall/Stuart
-x <- c(-50, 175, 149, 214, 247, 237, 225, 329, 729, 809,
-       530, 489, 540, 457, 195, 176, 337, 239, 128, 102, 232, 429, 3,
-       98, 43, -141, -77, -13, 125, 361, -45, 184)
-x <- ts(x, start = c(1951, 1), end = c(1958, 4), frequency = 4)
-m <- decompose(x)
-m$figure
-
-plot(m)
-
-```
-
-
-## Data preparation
-
-## Load the jokes rating data and do the basic checks
-```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-df <- read_csv(file="../../../data/jesterfinal151cols.csv.zip",col_names = FALSE)
-dim(df)
 ```
 
 # Time Series Methods Showcase
@@ -116,40 +135,58 @@ dim(df)
 ## Time series decomposition
 Time series decomposition is to decompose a time series into trend, seasonal, cyclical and irregular components. 
 Frequency represents data which has been sampled at equispaced points in time:
-- frequency=7: a weekly series
-- frequency=12: a monthly series
-- frequency=4: a quarterly series
-
-```{r}
-a <- ts(1:20, frequency = 12, start = c(2011, 3))
-print(a)
-
-str(a)
-attributes(a)
-```
+ - frequency=7: a weekly series
+ - frequency=12: a monthly series
+ - frequency=4: a quarterly series
 
 To decompose a time series into components:
 
-- Trend component: long term trend
-- Seasonal component: seasonal variation
-- Cyclical component: repeated but non-periodic fluctuations
-- Irregular component: the residuals
+ - Trend component: long term trend
+ - Seasonal component: seasonal variation
+ - Cyclical component: repeated but non-periodic fluctuations
+ - Irregular component: the residuals
 
-A time series of AirPassengers is used below as an example to demonstrate time series decomposition.
-Data AirPassengers: monthly totals of Box Jenkins international airline passengers, 1949 to 1960. It has 144(=12×12) values
+A \strong{simpleTS} time series object was constructed in section [Constructing TS object](#simpleTS). It is used below as an example to demonstrate time series decomposition (Fig \ref{fig:fig6}). It was constructed to have quarterly data and will be decomposed with frequency 4.
 
-```{r}
-plot(AirPassengers)
+```{r fig6, fig.cap="Decomposition of cyclic object example", fig.width=5.5}
+m <- decompose(simpleTS)
+plot(m)
 ```
 
-Seasonal figures
-```{r}
-f <- decompose(AirPassengers)
-f$figure
+A more complex example of time series manipulation and decomposition presented below. We will use 'open' series of the object stocks5_aal created in section [Loading Stock Data](#stocks5_aal)(Fig \ref{fig:fig7}). To decompose the series, we calculate yearly cycles of the last 4 years, data aggregated monthly (Fig \ref{fig:fig8}).
+
+
+```{r fig7, fig.cap="4 years AAL 'open' series", fig.width=5.5, fig.height=4}
+print(paste("Start date: ", start(stocks5_aal)))
+print(paste("Last date: ", end(stocks5_aal)))
+last2 <- window(stocks5_aal$open, start=as.Date("2014-01-01"), end=as.Date("2017-12-31"))
+plot(last2)
 ```
 
-Get names of 12 months in English words, label x-axis with month names and then 'las' is set to 2 for vertical label orientation (Fig \ref{fig:ffg1}:
-```{r fig1, fig.width=5.5, fig.cap="Cyclic Time Series Seasonal Component"}
+```{r fig8, fig.cap="Decomposition of 4 years AAL 'open' series", fig.width=5.5, fig.height=4}
+require(xts)
+w <- last2[endpoints(last2, "month")]
+m <- decompose(ts(w, frequency = 12))
+plot(m, xlab="", xaxt="n")
+axis(1, at=1:5, labels=c(2014,2015,2016,2017,2018), pos = -3.9)
+```
+
+```{r}
+#r <- rollapply(last2, 20, sd)
+#plot(r)
+
+#stocks5_aal
+```
+
+```{r}
+#w <- stocks5_aal$open[endpoints(stocks5_aal$open, "quarters")]
+#m <- decompose(ts(w, frequency = 4))
+#m$figure
+#plot(m)
+```
+
+Get names of 12 months in English words, label x-axis with month names and then 'las' is set to 2 for vertical label orientation (Fig \ref{fig:fig1}:
+```{r fig1, eval=FALSE, fig.cap="Cyclic", fig.width=5.5, include=FALSE}
 plot(f$figure, type="b", xaxt="n", xlab="")
 monthNames <- months(ISOdate(2011,1:12,1))
 axis(1, at=1:12, labels=monthNames, las=2)
@@ -158,7 +195,7 @@ axis(1, at=1:12, labels=monthNames, las=2)
 In the figure \ref{fig:fig2}, the first chart is the original time series, the second is trend, the third shows seasonal factors, and the last chart is the remaining component.
 
 ```{r fig2, fig.width=5.5, fig.cap="Cyclic Time Series Components"}
-plot(f)
+#plot(f)
 ```
 
 ## Time series forecasting
@@ -182,7 +219,6 @@ ts.plot(AirPassengers, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2))
 legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
        col=c(1,2,4), lty=c(1,1,2), cex=0.5)
 ```
-
 
 
 
