@@ -11,7 +11,7 @@ author:
   - name          : "Hui Fang Cai"
     affiliation   : "York University School of Continuing Studies"
 abstract: >
-  The goal of this project is to discover Time Seties analysis modelsand algorithms, show different application.
+  The goal of this project is to discover Time Series analysis. We start with the data loading and creation of different types of object including ts, xts and zoo and proceed with data manipulation, conversion and visualization. Then we discover different algorithms of time series analysis like decomposition, forecasting and clustering. At the end we develop a practical example and build a Shiny application.
 output:
   rticles::rjournal_article:
     includes:
@@ -20,8 +20,7 @@ figsintext        : no
 ---
 
 # Introduction
-
- 
+  The goal of this project is to discover Time Series analysis. We start with the data loading and creation of different types of object including ts, xts and zoo and proceed with data manipulation, conversion and visualization. Then we discover different algorithms of time series analysis like decomposition, forecasting and clustering. At the end we develop a practical example and build a Shiny application.
 
 ## Background
 
@@ -31,13 +30,11 @@ An xts object from package \CRANpkg{xts} \citep{xts} extends the S3 class \stron
 
 Similar to zoo objects, xts objects must have an ordered index. While zoo indexes cannot contain duplicate values, xts objects have optionally supported duplicate index elements since version 0.5-0. The xts class has one additional requirement, the index must be a time-based class. Currently supported classes include: 'Date', 'POSIXct', 'timeDate', as well as 'yearmon' and 'yearqtr' where the index values remain unique.
 
-## Objective
-## Plan
 ## Ethical Consideration for the Time Series ML Framework
-As the goal of this report is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The data is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that is under represented in this ratings dataset - we assume a low income population (limited access to internet, limited time to be spent rating jokes, etc). This will potentially reduce the recommender's accuracy for that group of the population. If the outcome of this system were to be of more social impact, this would need to be corrected with appropriate data collection methods.
+As the goal of this report is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The time series data used here is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that can't take advantage of analysis presented in this report - we assume a low income population with limited access to internet and not STEM educated. If the outcome of this system were to be of more social impact, this would need to be use more appropriate datasets, analysis of which could be more advantageous to that population.
 
+\newpage
 # Time Series Data Manipulating and Visualizing
-
 ```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 
@@ -98,6 +95,8 @@ As the name suggests we should have 500 (505 to be correct) stock names in the d
 ```{r}
 stocks5_aal <- stocks5[stocks5$Name=="AAL",c(1:6)]
 stocks5_aal <- zoo(stocks5_aal[,2:6], stocks5_aal$date)
+print(paste("Start date: ", start(stocks5_aal)))
+print(paste("Last date: ", end(stocks5_aal)))
 str(stocks5_aal)
 ```
 
@@ -105,13 +104,14 @@ str(stocks5_aal)
 plot(stocks5_aal, xlab = "", nc = 1, main = "")
 ```
 
+## Additional time series data sets
 
-## Dataset 1
-Yahoo Science labeled time series. This set is big, it should be downloaded and used locally:
+### Yahoo Science labeled time series
+Yahoo Science labeled time series is a big Synthetic and real time-series with labeled anomalies, it should be downloaded and used locally.
 [Yahoo Science labeled time series](https://github.com/ivbsoftware/CSDA1040-project-3/blob/master/data/orig/ydata-labeled-time-series-anomalies-v1_0.zip)
 
-## Dataset 2
-NAB Data Corpus: better just load from github directly to R script. [NAB Data Corpus](https://github.com/numenta/NAB/tree/master/data)
+### NAB Data Corpus
+[NAB Data Corpus](https://github.com/numenta/NAB/tree/master/data) is a large dataset of ordered, timestamped, single-valued metrics. All data files contain anomalies, unless otherwise noted. This data better be loaded from github directly to R script.
 
 
 ```{r eval=FALSE, include=FALSE}
@@ -125,7 +125,7 @@ m <- decompose(ts(w, frequency = 7))
 plot(m$figure)
 plot(m)
 
-f <- decompose(apply.weekly(tt1_xts))
+f <- decompose(apply.weekly(tt1_xts))s
 f$figure
 
 ```
@@ -135,6 +135,7 @@ f$figure
 ## Time series decomposition
 Time series decomposition is to decompose a time series into trend, seasonal, cyclical and irregular components. 
 Frequency represents data which has been sampled at equispaced points in time:
+
  - frequency=7: a weekly series
  - frequency=12: a monthly series
  - frequency=4: a quarterly series
@@ -153,49 +154,20 @@ m <- decompose(simpleTS)
 plot(m)
 ```
 
-A more complex example of time series manipulation and decomposition presented below. We will use 'open' series of the object stocks5_aal created in section [Loading Stock Data](#stocks5_aal)(Fig \ref{fig:fig7}). To decompose the series, we calculate yearly cycles of the last 4 years, data aggregated monthly (Fig \ref{fig:fig8}).
+A more complex example of time series manipulation and decomposition presented below. We will use 'open' series of the object stocks5_aal created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last 4 years, data aggregated monthly (Fig \ref{fig:fig8}).
 
 
 ```{r fig7, fig.cap="4 years AAL 'open' series", fig.width=5.5, fig.height=4}
-print(paste("Start date: ", start(stocks5_aal)))
-print(paste("Last date: ", end(stocks5_aal)))
-last2 <- window(stocks5_aal$open, start=as.Date("2014-01-01"), end=as.Date("2017-12-31"))
-plot(last2)
+last4 <- window(stocks5_aal$open, start=as.Date("2014-01-01"), end=as.Date("2017-12-31"))
+plot(last4)
 ```
 
 ```{r fig8, fig.cap="Decomposition of 4 years AAL 'open' series", fig.width=5.5, fig.height=4}
 require(xts)
-w <- last2[endpoints(last2, "month")]
-m <- decompose(ts(w, frequency = 12))
+last4_mo <- last4[endpoints(last4, "month")]
+m <- decompose(ts(last4_mo, frequency = 12))
 plot(m, xlab="", xaxt="n")
 axis(1, at=1:5, labels=c(2014,2015,2016,2017,2018), pos = -3.9)
-```
-
-```{r}
-#r <- rollapply(last2, 20, sd)
-#plot(r)
-
-#stocks5_aal
-```
-
-```{r}
-#w <- stocks5_aal$open[endpoints(stocks5_aal$open, "quarters")]
-#m <- decompose(ts(w, frequency = 4))
-#m$figure
-#plot(m)
-```
-
-Get names of 12 months in English words, label x-axis with month names and then 'las' is set to 2 for vertical label orientation (Fig \ref{fig:fig1}:
-```{r fig1, eval=FALSE, fig.cap="Cyclic", fig.width=5.5, include=FALSE}
-plot(f$figure, type="b", xaxt="n", xlab="")
-monthNames <- months(ISOdate(2011,1:12,1))
-axis(1, at=1:12, labels=monthNames, las=2)
-```
-
-In the figure \ref{fig:fig2}, the first chart is the original time series, the second is trend, the third shows seasonal factors, and the last chart is the remaining component.
-
-```{r fig2, fig.width=5.5, fig.cap="Cyclic Time Series Components"}
-#plot(f)
 ```
 
 ## Time series forecasting
@@ -205,22 +177,90 @@ Time series forecasting is to forecast future events based on known past data. T
  - Autoregressive moving average (ARMA)
  - Autoregressive integrated moving average (ARIMA)
 
-Example below (Fig. \ref{fig:fig3}) shows forecasting using ARIMA model.
+Example on Fig. \ref{fig:fig3} shows forecasting using ARIMA model.
 
-```{r fig3, fig.width=5.5, fig.cap="Cyclic Time Series Forecasting with ARIMA model"}
-fit <- arima(AirPassengers, order=c(1,0,0), list(order=c(2,1,0), period=12))
-fore <- predict(fit, n.ahead=24)
+```{r fig3, fig.width=5.5, fig.cap="Cyclic Time Series Forecasting with ARIMA model", fig.height=4}
+ff <- ts(last4_mo)
+fit <- arima(ff, order=c(1,0,0), list(order=c(2,1,0), period=12))
+fore <- predict(fit, n.ahead=12)
 
 # error bounds at 95% confidence level
 U <- fore$pred + 2*fore$se
 L <- fore$pred - 2*fore$se
 
-ts.plot(AirPassengers, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2))
+ts.plot(ff, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2), 
+        xlab="", gpars = list(xaxt="n"))
+axis(1, at=seq(from=1, to=72, by=12), labels=c(2014,2015,2016,2017,2018,2019))
 legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
        col=c(1,2,4), lty=c(1,1,2), cex=0.5)
 ```
 
+## Time series forecasting with forecast package
 
+It is common practice to split the data into two parts, training and test data, where the training data is used to estimate any parameters of a forecasting method and the test data is used to evaluate its accuracy. To perform this task and also to test several additional forrecasting methods we used package \CRANpkg{forecast} \citep{forecast}.
+
+Code below creates train and test data from the the previously obtained 'open' stock data for the last 4 years aggregated monthly. Then it fits the train data using several models and plots the fitting results in the Fig.\ref{fig:fig10}. It also plots  the test portion in red for easy comparision of prediction and real data.
+
+```{r}
+library(forecast)
+
+# test data
+test_x <- window(last4_mo, start=as.Date("2016-12-20"))
+test_x <- ts(test_x, frequency = 12)
+str(test_x)
+
+#train data
+x <- window(last4_mo, end=as.Date("2016-12-31"))
+x <- ts(x, frequency = 12)
+str(x)
+```
+
+```{r}
+models <- list(
+  mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE),
+  mod_exp = ets(x, ic='aicc', restrict=FALSE),
+  mod_neural = nnetar(x, p=12, size=25),
+  mod_tbats = tbats(x, ic='aicc', seasonal.periods=12),
+  mod_bats = bats(x, ic='aicc', seasonal.periods=12),
+  mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets'),
+  mod_sts = StructTS(x)
+  )
+```
+
+```{r fig10, fig.height=9, fig.width=6, fig.cap="AAL stock prediction vs reality using different forecasting methods"}
+forecasts <- lapply(models, forecast, 12)
+forecasts$naive <- naive(x, 12)
+par(mfrow=c(4, 2))
+for(f in forecasts){
+  plot(f, xlab="", xaxt="n")
+  lines(y=test_x[1:13], x=seq(from=(4-1/12), to=5, by=1/12)[1:13], col='red')
+  axis(1, at=1:5, labels=c(2014,2015,2016,2017,2018))
+}
+```
+
+## Evaluating forecast accuracy
+Because the test data is not used in determining the forecasts, it should provide a reliable indication of how well the model is likely to forecast on new data. he metrics used below are described in \citep{hyndman_forecasting:_2014}, also available online [here](https://otexts.com/fpp2/accuracy.html). The metrics are:
+
+ - ME - Mean absolute error
+ - RMSE - Root mean squared error
+ - MAE - mean absolute erro
+ - MPE - mean percentage error
+ - MAPE - Mean absolute percentage error
+ - MASE - mean absolute scaled error
+ - Theil's U - Uncertainty coefficient
+
+Code below (adaptation of [Timeseries analysis procedure and methods using R](https://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r)) calculates common forecast errors of the predictions made in the previous section.
+ 
+```{r}
+test_xx <- ts(test_x[2:13], start=c(4,1), frequency = 12)
+acc <- lapply(forecasts, function(f){
+  accuracy(f, test_xx)[2,,drop=FALSE]
+})
+acc <- Reduce(rbind, acc)
+row.names(acc) <- names(forecasts)
+acc <- acc[order(acc[,'MASE']),]
+round(acc, 2)
+```
 
 # Example of Time-Series Analysis Practical Application 
 
