@@ -155,22 +155,18 @@ m <- decompose(simpleTS)
 plot(m)
 ```
 
-A more complex an realistic example of time series manipulation and decomposition presented below. We will use 'open' series of the object AAL stock taken directly from Yahoo Finance using \CRANpkg{quantmod} \citep{quantmod} package instead of data created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last years since 2010, data aggregated monthly (Fig. \ref{fig:fig8}).
+A more complex an realistic example of time series manipulation and decomposition presented below. We will use 'open' series of the object AAL stock taken directly from Yahoo Finance using \CRANpkg{tseries} \citep{tseries} package instead of data created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last years since 2010, data aggregated monthly (Fig. \ref{fig:fig8}).
 
-
-```{r fig7, fig.cap="8 years of AAL 'open' series", fig.width=5.5}
-library(quantmod)
-
-tickers <- c('AAL')
-data <- new.env()
-getSymbols(tickers, src = 'yahoo', from = '2010-01-01', env = data)    
-last8 <- window(data$AAL$AAL.Open, start=as.Date("2010-01-01"), end=as.Date("2017-12-31"))
-plot(last8)
+```{r fig7, fig.cap="AAL dayly stock data since 2010", fig.width=5.5}
+library("tseries")
+AAL <- get.hist.quote(instrument = "AAL", start = "2010-01-01")
+plot(AAL, xlab = "")
 ```
 
 ```{r fig8, fig.cap="Decomposition of 8 years AAL 'open' series", fig.width=5.5, fig.height=4}
 require(xts)
-last8_mo <- last8[endpoints(last8, "month")]
+last8 <- window(AAL$Open, start=as.Date("2010-01-01"), end=as.Date("2017-12-31"))
+last8_mo <- aggregate(last8, as.yearmon, tail, 1)
 m <- decompose(ts(last8_mo, frequency = 12))
 years <- seq(2010, 2020, 1)
 plot(m, xlab="", xaxt="n")
@@ -206,23 +202,26 @@ legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
 
 It is common practice to split the data into two parts, training and test data, where the training data is used to estimate any parameters of a forecasting method and the test data is used to evaluate its accuracy. To perform this task and also to test several additional forrecasting methods we used package \CRANpkg{forecast} \citep{forecast}.
 
-Code below creates train and test data from the the previously obtained 'open' stock data for the last 4 years aggregated monthly. Then it fits the train data using several models and plots the fitting results in the Fig.\ref{fig:fig10}. It also plots  the test portion in red for easy comparision of prediction and real data.
+Code below creates train and test data from the the previously obtained 'open' stock data for the last 8 years aggregated monthly. Then it fits the train data using several models and plots the fitting results in the Fig.\ref{fig:fig10}. It also plots  the test portion in red for easy comparision of prediction and real data.
 
 ```{r}
 library(forecast)
 
 # test data
-test_x <- window(last8_mo, start=as.Date("2016-12-20"))
+test_x <- window(last8, start=as.Date("2016-12-20"))
+test_x <- test_x[endpoints(test_x, "month")]
 test_x <- ts(test_x, frequency = 12)
 str(test_x)
 
 #train data
-x <- window(last8_mo, end=as.Date("2016-12-31"))
+x <- window(last8, end=as.Date("2016-12-31"))
+x <- x[endpoints(x, "month")]
 x <- ts(x, frequency = 12)
 str(x)
 ```
 
 ```{r}
+library(forecast)
 if(!file.exists("./models.Rds")) {
   models <- list(
     mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE),
