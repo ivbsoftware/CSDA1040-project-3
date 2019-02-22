@@ -100,6 +100,7 @@ print(paste("Last date: ", end(stocks5_aal)))
 str(stocks5_aal)
 ```
 
+
 ```{r fig5, fig.width=5.5, fig.height=9, fig.cap="Multi-variate time series visualization of AAL stock"}
 plot(stocks5_aal, xlab = "", nc = 1, main = "")
 ```
@@ -154,20 +155,26 @@ m <- decompose(simpleTS)
 plot(m)
 ```
 
-A more complex example of time series manipulation and decomposition presented below. We will use 'open' series of the object stocks5_aal created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last 4 years, data aggregated monthly (Fig \ref{fig:fig8}).
+A more complex an realistic example of time series manipulation and decomposition presented below. We will use 'open' series of the object AAL stock taken directly from Yahoo Finance using \CRANpkg{quantmod} \citep{quantmod} package instead of data created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last years since 2010, data aggregated monthly (Fig. \ref{fig:fig8}).
 
 
-```{r fig7, fig.cap="4 years AAL 'open' series", fig.width=5.5, fig.height=4}
-last4 <- window(stocks5_aal$open, start=as.Date("2014-01-01"), end=as.Date("2017-12-31"))
-plot(last4)
+```{r fig7, fig.cap="8 years of AAL 'open' series", fig.width=5.5}
+library(quantmod)
+
+tickers <- c('AAL')
+data <- new.env()
+getSymbols(tickers, src = 'yahoo', from = '2010-01-01', env = data)    
+last8 <- window(data$AAL$AAL.Open, start=as.Date("2010-01-01"), end=as.Date("2017-12-31"))
+plot(last8)
 ```
 
-```{r fig8, fig.cap="Decomposition of 4 years AAL 'open' series", fig.width=5.5, fig.height=4}
+```{r fig8, fig.cap="Decomposition of 8 years AAL 'open' series", fig.width=5.5, fig.height=4}
 require(xts)
-last4_mo <- last4[endpoints(last4, "month")]
-m <- decompose(ts(last4_mo, frequency = 12))
+last8_mo <- last8[endpoints(last8, "month")]
+m <- decompose(ts(last8_mo, frequency = 12))
+years <- seq(2010, 2020, 1)
 plot(m, xlab="", xaxt="n")
-axis(1, at=1:5, labels=c(2014,2015,2016,2017,2018), pos = -3.9)
+axis(1, at=1:9, labels=years[1:9], pos = -6.6)
 ```
 
 ## Time series forecasting
@@ -180,9 +187,9 @@ Time series forecasting is to forecast future events based on known past data. T
 Example on Fig. \ref{fig:fig3} shows forecasting using ARIMA model.
 
 ```{r fig3, fig.width=5.5, fig.cap="Cyclic Time Series Forecasting with ARIMA model", fig.height=4}
-ff <- ts(last4_mo)
+ff <- ts(last8_mo)
 fit <- arima(ff, order=c(1,0,0), list(order=c(2,1,0), period=12))
-fore <- predict(fit, n.ahead=12)
+fore <- predict(fit, n.ahead=18)
 
 # error bounds at 95% confidence level
 U <- fore$pred + 2*fore$se
@@ -190,7 +197,7 @@ L <- fore$pred - 2*fore$se
 
 ts.plot(ff, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2), 
         xlab="", gpars = list(xaxt="n"))
-axis(1, at=seq(from=1, to=72, by=12), labels=c(2014,2015,2016,2017,2018,2019))
+axis(1, at=seq(from=1, to=121, by=12), labels=years[1:11])
 legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
        col=c(1,2,4), lty=c(1,1,2), cex=0.5)
 ```
@@ -205,26 +212,31 @@ Code below creates train and test data from the the previously obtained 'open' s
 library(forecast)
 
 # test data
-test_x <- window(last4_mo, start=as.Date("2016-12-20"))
+test_x <- window(last8_mo, start=as.Date("2016-12-20"))
 test_x <- ts(test_x, frequency = 12)
 str(test_x)
 
 #train data
-x <- window(last4_mo, end=as.Date("2016-12-31"))
+x <- window(last8_mo, end=as.Date("2016-12-31"))
 x <- ts(x, frequency = 12)
 str(x)
 ```
 
 ```{r}
-models <- list(
-  mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE),
-  mod_exp = ets(x, ic='aicc', restrict=FALSE),
-  mod_neural = nnetar(x, p=12, size=25),
-  mod_tbats = tbats(x, ic='aicc', seasonal.periods=12),
-  mod_bats = bats(x, ic='aicc', seasonal.periods=12),
-  mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets'),
-  mod_sts = StructTS(x)
-  )
+if(!file.exists("./models.Rds")) {
+  models <- list(
+    mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE),
+    mod_exp = ets(x, ic='aicc', restrict=FALSE),
+    mod_neural = nnetar(x, p=12, size=25),
+    mod_tbats = tbats(x, ic='aicc', seasonal.periods=12),
+    mod_bats = bats(x, ic='aicc', seasonal.periods=12),
+    mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets'),
+    mod_sts = StructTS(x)
+    )
+  saveRDS(models, file = "./models.Rds")
+} else  {
+  models <- readRDS("./models.Rds")
+}
 ```
 
 ```{r fig10, fig.height=9, fig.width=6, fig.cap="AAL stock prediction vs reality using different forecasting methods"}
@@ -233,8 +245,8 @@ forecasts$naive <- naive(x, 12)
 par(mfrow=c(4, 2))
 for(f in forecasts){
   plot(f, xlab="", xaxt="n")
-  lines(y=test_x[1:13], x=seq(from=(4-1/12), to=5, by=1/12)[1:13], col='red')
-  axis(1, at=1:5, labels=c(2014,2015,2016,2017,2018))
+  lines(y=test_x[1:13], x=seq(from=(8-1/12), to=9, by=1/12)[1:13], col='red')
+  axis(1, at=1:10, labels=years[1:10])
 }
 ```
 
@@ -252,7 +264,7 @@ Because the test data is not used in determining the forecasts, it should provid
 Code below (adaptation of [Timeseries analysis procedure and methods using R](https://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r)) calculates common forecast errors of the predictions made in the previous section.
  
 ```{r}
-test_xx <- ts(test_x[2:13], start=c(4,1), frequency = 12)
+test_xx <- ts(test_x[2:13], start=c(8,1), frequency = 12)
 acc <- lapply(forecasts, function(f){
   accuracy(f, test_xx)[2,,drop=FALSE]
 })
@@ -262,6 +274,22 @@ acc <- acc[order(acc[,'MASE']),]
 round(acc, 2)
 ```
 
+## Time series clustering
+Time series clustering partitioning time series data into groups based on similarity or distance, so that time series in the same cluster are similar. For time series clustering with R, the first step is to work out an appropriate distance/similarity metric, and then, at the second step, use existing clustering techniques, such as k-means, hierarchical clustering, density-based clustering or subspace clustering, to find clustering structures.
+
+Dynamic Time Warping (DTW) finds optimal alignment between two time series, and DTW distance is used as a distance metric in the example below.
+
+Measure of distance/dissimilarity
+ - Euclidean distance
+ - Manhattan distance
+ - Maximum norm
+ - Hamming distance
+ - The angle between two vectors (inner product)
+ - Dynamic Time Warping (DTW) distance
+
+
+
+\newpage
 # Example of Time-Series Analysis Practical Application 
 
 ## Prepare Shiny App for Deployment
