@@ -558,14 +558,15 @@ nasdaqTraded$Security.Name <- factor(nasdaqTraded$Security.Name)
 
 tail(nasdaqTraded)
 ```
-Now lets take 5 random stocks andrequest their montholy quotes for the last year
-```{r fig20, fig.cap="Random stocks Close prices", fig.height=9, fig.width=6, message=FALSE, warning=FALSE, paged.print=FALSE}
+Now lets take 5 random stocks andrequest their montholy quotes for the last 10 years (Fig. \ref{fig:fig20}):
+```{r fig20, fig.cap="Random stocks 'Close' prices", fig.height=9, fig.width=6, message=FALSE, warning=FALSE, paged.print=FALSE}
 set.seed(21)
 library("tseries")
+nStocks <- 5
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
 
-stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), 5),]
 z <- list()
-par(mfrow = c(5, 1))
+par(mfrow = c(nStocks, 1))
 for (i in 1:nrow(stocks)) {
   name <- toString(stocks[i, "Symbol"][1])
   z[[i]] <- get.hist.quote(
@@ -575,31 +576,91 @@ for (i in 1:nrow(stocks)) {
     start = Sys.Date() - (365*10))
   plot(z[[i]], xlab = "", ylab="", main=name)
 }
-
-
-
 ```
 
 ## Prediction of stock prices
-```{r fig.height=3, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of stock prices"}
+
+The code below defines functions to read, predict and plot stocks to be used in the Shiny App:
+```{r}
 library(forecast)
-n <- 4
-freq <- 12
-toForecast <- 12
-x <- ts(z[[n]], frequency=freq)
-dmin <- start(z[[n]])
 
-models <- list(
-  mod_stl = stlm(x, s.window=freq, ic='aicc', robust=TRUE, method='ets')
-)
+readStocks <- function(stocksList, startDate, quote = "Close", isMonthly=TRUE) {
+  z <- list()
+  compression <- if (isMonthly == TRUE) "m" else "d"
+  for (i in 1:nrow(stocksList)) {
+    name <- toString(stocksList[i, "Symbol"][1])
+    tryCatch({
+      z[[name]] <- get.hist.quote(
+        instrument = name, 
+        quote = quote,
+        compression = compression,
+        start = startDate)
+    },
+    error=function(cond) {
+      message(cond)      
+    })
+  }
+  return (z)
+}
 
-name <- toString(stocks[n, "Symbol"][1])
-forecasts <- lapply(models, forecast, toForecast)
-len <- ceiling(1 + length(x)/freq)
-for (f in forecasts) {
-  ticks<-format(seq(as.Date(dmin), by="years", length.out = len), format = "%b-%Y")
-  plot(f, xlab="", xaxt="n")
-  axis(1, at=1:len, labels=ticks, par(las=2))
+plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE) {
+  x <- ts(stockZoo, frequency=freq)
+  dmin <- start(z[[n]])
+  dmax <- end(z[[n]])
+  
+  tryCatch({
+    models <- list(
+      mod_stl = stlm(x, s.window=freq, ic='aicc', robust=TRUE, method='ets')
+    )
+  
+    forecasts <- lapply(models, forecast, toForecast)
+    len <- ceiling(1 + length(x)/freq) 
+    format <- if (isMonthly == TRUE) "%b-%Y" else "%Y-%m-%d"
+    by <- if (isMonthly == TRUE) paste(freq, "months") else paste(freq, "days")
+    to <- if (isMonthly == TRUE) as.Date(dmax) + toForecast*30 else as.Date(dmax) + toForecast
+    for (f in forecasts) {
+      ticks<-format(seq(as.Date(dmin),to=to, length.out=len), format=format)
+      print (ticks)
+      plot(f, xlab="", xaxt="n", main = paste(stockSymbol, "Stock Forecast"))
+      axis(1, at=1:len, labels=ticks, par(las=2))
+    }
+  },
+  error=function(cond) {
+    message(cond)      
+  })
+}
+```
+
+Let's test print forecast for the next 6 month of up to 5 random stocks (Fig. \ref{fig:fig21})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since 2016.
+
+```{r fig21, fig.height=9, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of monthly stock prices"}
+
+set.seed(99)
+nStocks <- 5
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
+
+z <- readStocks(stocks, "2010-01-01", "Close", TRUE)
+
+par(mfrow = c(nStocks, 1))
+for (n in 1:length(z)) {
+  plotForecast(z[[n]], names(z)[n], 12, 12)
+}
+```
+
+
+Now let's test print forecast for the next 2 weeks of up to 5 random stocks (Fig. \ref{fig:fig22})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since beginning of 2018.
+
+```{r fig22, fig.height=9, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of daily stock prices"}
+
+set.seed(99)
+nStocks <- 5
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
+
+z <- readStocks(stocks, "2018-08-01", "Close", isMonthly=FALSE)
+
+par(mfrow = c(nStocks, 1))
+for (n in 1:length(z)) {
+  plotForecast(z[[n]], names(z)[n], 10, 10, isMonthly=FALSE)
 }
 ```
 
