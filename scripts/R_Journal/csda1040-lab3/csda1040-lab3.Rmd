@@ -573,46 +573,42 @@ for (i in 1:nrow(stocks)) {
     quote = "Close",
     compression = "m",
     start = Sys.Date() - (365*10))
-  
   plot(z[[i]], xlab = "", ylab="", main=name)
 }
+
+
 
 ```
 
 ## Prediction of stock prices
-```{r message=FALSE, warning=FALSE}
+```{r fig.height=3, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of stock prices"}
 library(forecast)
-
-x <- ts(z[[2]], frequency=12)
-#x <- x[endpoints(x, "month")]
-#x <- ts(x, frequency = 12)
-str(x)
+n <- 4
+freq <- 12
+toForecast <- 12
+x <- ts(z[[n]], frequency=freq)
+dmin <- start(z[[n]])
 
 models <- list(
-  mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
+  mod_stl = stlm(x, s.window=freq, ic='aicc', robust=TRUE, method='ets')
 )
 
-forecasts <- lapply(models, forecast, 12)
+name <- toString(stocks[n, "Symbol"][1])
+forecasts <- lapply(models, forecast, toForecast)
+len <- ceiling(1 + length(x)/freq)
 for (f in forecasts) {
-  plot(f, xlab="")
-#lines(y=test_x[1:13], x=seq(from=(8-1/12), to=9, by=1/12)[1:13], col='red')
-#axis(1, at=1:10, labels=years[1:10])
+  ticks<-format(seq(as.Date(dmin), by="years", length.out = len), format = "%b-%Y")
+  plot(f, xlab="", xaxt="n")
+  axis(1, at=1:len, labels=ticks, par(las=2))
 }
 ```
 
 # Deployment Discussion
 
-This model is currently not of much use given its accuracy but it will serve as a proof of concept. This model could be used to help writers of movies/tv shows write jokes appropriate for a specific or large audience. 
-
-More data should be collected from this userbase to fill a training dataset. The dataset in its current state is quite sparse. The data would need to be updated every 3-5 years as people's taste changes and people within certian age groups mature. The Shiny app developed would be a deployment method to collect more data. 
-
-Further analysis could be done (with the appropriate data) to see how similar taste in humor is related to age.
-
-The model developed in this project was used to create Shiny application currently deployed at [ivbsoftware.shinyapps.io/JokeRecommender/](https://ivbsoftware.shinyapps.io/TimeSeries1/). Code of the application could be found in [Github](https://github.com/ivbsoftware/CSDA1040-project-3/tree/master/shiny/).
+The model developed in this project was used to create Shiny application currently deployed at [ivbsoftware.shinyapps.io/Stocks/](https://ivbsoftware.shinyapps.io/Stocks/). Code of the application could be found in [Github](https://github.com/ivbsoftware/CSDA1040-project-3/tree/master/shiny/).
 
 \newpage
 \bibliography{RJreferences}
 
 # Note from the Authors
-
-This file was generated using [_The R Journal_ style article template](https://github.com/rstudio/rticles), additional information on how to prepare articles for submission is here - [Instructions for Authors](https://journal.r-project.org/share/author-guide.pdf). The article itself is an executable R Markdown file that could be [downloaded from Github](https://github.com/ivbsoftware/CSDA1040-project-1/tree/master/scripts/R_Journal/csda1040-lab1) with all the necessary artifacts.
+This file was generated using [_The R Journal_ style article template](https://github.com/rstudio/rticles), additional information on how to prepare articles for submission is here - [Instructions for Authors](https://journal.r-project.org/share/author-guide.pdf). The article itself is an executable R Markdown file that could be [downloaded from Github](https://github.com/ivbsoftware/CSDA1040-project-3/tree/master/scripts/R_Journal/csda1040-lab3) with all the necessary artifacts.
