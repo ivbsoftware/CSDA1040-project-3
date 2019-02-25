@@ -533,12 +533,71 @@ table(classId[s$ix[1:k]])
 
 # Example of Time-Series Analysis Practical Application 
 
+As a practical example of Time Series analysis we will develop a Shiny application dealing with Nasdaq stock data.
+
 ## Prepare Shiny App for Deployment
 
-## Saving recommender data objects
+Fists step is loading a list of all Nasdaq listings. The description of the data is [here](https://www.nasdaqtrader.com/Trader.aspx?id=SymbolDirDefs);
+
+```{r}
+nasdaqTraded <- read.csv(
+  file = "ftp://ftp.nasdaqtrader.com/SymbolDirectory/nasdaqtraded.txt",
+  sep = "|"  )
+
+# last line in the file is the date of creation as " File Creation Time: mmddyyyyhhmm"
+creationDate <- as.list(levels(nasdaqTraded[-1,1]))[[1]]
+print(creationDate)
+nasdaqTraded <- nasdaqTraded[1:nrow(nasdaqTraded)-1,]
+
+# remove unnecessary rows and columns
+nasdaqTraded <- nasdaqTraded[
+  (nasdaqTraded$Nasdaq.Traded=="Y" & nasdaqTraded$Financial.Status=="N"),
+  c(2,3)]
+nasdaqTraded$Symbol <- factor(nasdaqTraded$Symbol)
+nasdaqTraded$Security.Name <- factor(nasdaqTraded$Security.Name)
+
+tail(nasdaqTraded)
+```
+Now lets take 5 random stocks andrequest their montholy quotes for the last year
+```{r fig20, fig.cap="Random stocks Close prices", fig.height=9, fig.width=6, message=FALSE, warning=FALSE, paged.print=FALSE}
+set.seed(21)
+library("tseries")
+
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), 5),]
+z <- list()
+par(mfrow = c(5, 1))
+for (i in 1:nrow(stocks)) {
+  name <- toString(stocks[i, "Symbol"][1])
+  z[[i]] <- get.hist.quote(
+    instrument = name, 
+    quote = "Close",
+    compression = "m",
+    start = Sys.Date() - (365*10))
+  
+  plot(z[[i]], xlab = "", ylab="", main=name)
+}
+
+```
+
+## Prediction of stock prices
 ```{r message=FALSE, warning=FALSE}
-#saveRDS(rcmnd_ub, file = "jokeRecommender.Rds")
-#saveRDS(jokes, file = "jokes.Rds")
+library(forecast)
+
+x <- ts(z[[2]], frequency=12)
+#x <- x[endpoints(x, "month")]
+#x <- ts(x, frequency = 12)
+str(x)
+
+models <- list(
+  mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets')
+)
+
+forecasts <- lapply(models, forecast, 12)
+for (f in forecasts) {
+  plot(f, xlab="")
+#lines(y=test_x[1:13], x=seq(from=(8-1/12), to=9, by=1/12)[1:13], col='red')
+#axis(1, at=1:10, labels=years[1:10])
+}
 ```
 
 # Deployment Discussion
@@ -551,9 +610,8 @@ Further analysis could be done (with the appropriate data) to see how similar ta
 
 The model developed in this project was used to create Shiny application currently deployed at [ivbsoftware.shinyapps.io/JokeRecommender/](https://ivbsoftware.shinyapps.io/TimeSeries1/). Code of the application could be found in [Github](https://github.com/ivbsoftware/CSDA1040-project-3/tree/master/shiny/).
 
-\bibliography{RJreferences}
-
 \newpage
+\bibliography{RJreferences}
 
 # Note from the Authors
 
