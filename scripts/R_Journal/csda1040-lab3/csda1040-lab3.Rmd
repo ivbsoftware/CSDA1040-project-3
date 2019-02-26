@@ -615,14 +615,15 @@ plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE
   
     forecasts <- lapply(models, forecast, toForecast)
     len <- ceiling(1 + length(x)/freq) 
-    format <- if (isMonthly == TRUE) "%b-%Y" else "%Y-%m-%d"
-    by <- if (isMonthly == TRUE) paste(freq, "months") else paste(freq, "days")
-    to <- if (isMonthly == TRUE) as.Date(dmax) + toForecast*30 else as.Date(dmax) + toForecast
+    format <- if (isMonthly) "%b-%Y" else "%Y-%m-%d"
+    by <- if (isMonthly) paste(freq, "months") else paste(freq, "days")
+    to <- if (isMonthly) as.Date(dmax)+toForecast*30 else as.Date(dmax)+toForecast
+    las <- if (isMonthly) 1 else 2
     for (f in forecasts) {
       ticks<-format(seq(as.Date(dmin),to=to, length.out=len), format=format)
       print (ticks)
       plot(f, xlab="", xaxt="n", main = paste(stockSymbol, "Stock Forecast"))
-      axis(1, at=1:len, labels=ticks, par(las=2))
+      axis(1, at=1:len, labels=ticks, par(las=las))
     }
   },
   error=function(cond) {

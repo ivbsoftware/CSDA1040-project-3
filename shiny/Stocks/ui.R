@@ -1,33 +1,36 @@
-#
-# This is the user-interface definition of a Shiny web application. You can
-# run the application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-# 
-#    http://shiny.rstudio.com/
-#
-
 library(shiny)
+library(shinythemes)
+library(shinyjs)
+
+## UI extensions
+jscode <- "
+shinyjs.refocus = function(e_id) {
+document.getElementById(e_id).focus();
+}"
 
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
   
-  # Application title
-  titlePanel("Old Faithful Geyser Data"),
+  theme=shinytheme("journal"),
+  shinyjs::useShinyjs(),
+  extendShinyjs(text = jscode, functions = "refocus"),
+  tags$style(HTML(" .shiny-input-container:not(.shiny-input-container-inline) { width: 100%; height: 100%; }")),
+  tags$head(tags$style(type="text/css", ".container-fluid {  max-width: 1000px;}")),
+  
+  titlePanel("Stock Analyzer"),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-       sliderInput("bins",
-                   "Number of bins:",
-                   min = 1,
-                   max = 50,
-                   value = 30)
+      dateInput(inputId = "dateFrom", label = "From", value = seq(Sys.Date(), length=2, by = "-364 days")[2],
+               format = "yyyy-mm-dd", width = "100%")
     ),
     
     # Show a plot of the generated distribution
     mainPanel(
-       plotOutput("distPlot")
+      column(12,
+        plotOutput("distPlot")
+      )
     )
   )
 ))
