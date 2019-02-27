@@ -2,6 +2,7 @@ library(shiny)
 library(shinythemes)
 library(shinyjs)
 library(shinyWidgets)
+library(shinyBS)
 
 ## UI extensions
 jscode <- "
@@ -40,24 +41,37 @@ shinyUI(fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      actionButton("select", "Select Stocks", width = "100%"),
-      p(),              
       actionButton("go", "Run Forecast", width = "100%", class="btn btn-primary"),
       hr(),              
       dateInput(inputId="dateFrom", label = "From", format = "yyyy-mm-dd", width = "100%", value = NA),
       sliderInput("back", min=-100, max=-1, value=-3, label=""),
       radioButtons("compression", "Aggregate Data:",
                    c("Monthly" = "m","Daily" = "d")),
-      sliderInput("stocksNum", min=1, max=5, value=3, label="Stocks to Load"),
+      sliderInput("stocksNum", min=1, max=5, value=1, label="Stocks to Load"),
       sliderInput("freq", min=6, max=24, value=12, label="Window"),
-      sliderInput("predict", min=6, max=24, value=12, label="To Predict")
-#      p(),              
-#      actionButton("updateRandom", "Load Random Stocks",width = "100%"),  
-#      actionButton("reset", "Reset", width = "100%", class="btn btn-warning")
+      sliderInput("predict", min=6, max=24, value=12, label="To Predict"),
+      # for potencial use as modal dialog
+      # bsModal("modalExample", "Nasdaq Listed Stocks", "selectStocks", 
+      #         size = "large", 
+      #         verbatimTextOutput('msg'),
+      #         p(),
+      #         DT::dataTableOutput('tbl')
+      #       ),
+      hidden(numericInput(inputId='refresh_helper', value=0, label=NULL)) # on app start trigger
     ),
-    
+
     mainPanel(
-      plotOutput("distPlot")
+      tabsetPanel(id="tabPanels",
+        tabPanel("Nasdaq Listed", value="nasdaqtPanel", 
+                 p(),
+                 span(textOutput('msg2'), style="color:red"),
+                 p(), 
+                 DT::dataTableOutput('tbl2')
+        ),
+        tabPanel("Forecast", value="forecastPanel", plotOutput("distPlot")),
+        tabPanel("Decomposition", value="decomptPanel", span(textOutput("m1"), style="color:red")),
+        tabPanel("Comparision", value="compPanel", span(textOutput("m2"), style="color:red"))      
+      )
     )
   )
 ))

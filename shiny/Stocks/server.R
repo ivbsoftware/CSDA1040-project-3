@@ -5,6 +5,7 @@ library(tseries)
 library(lubridate)
 library(zoo)
 library(lattice)
+library(DT)
 
 # Reading list of Nasdaq - listed stock names ans clean it
 readNasdaqListings <- function() {
@@ -80,7 +81,7 @@ plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE
     
     forecasts <- lapply(models, forecast, toForecast)
     len <- ceiling(1 + length(x)/freq) 
-    format <- if (isMonthly) "%b-%Y" else "%Y-%m-%d"
+    format <- if (isMonthly) "%b-%Y" else " %Y-%m-%d"
     by <- if (isMonthly) paste(freq, "months") else paste(freq, "days")
     to <- if (isMonthly) as.Date(dmax)+toForecast*30 else as.Date(dmax)+toForecast
     las <- if (isMonthly) 1 else 2
@@ -104,15 +105,14 @@ plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE
   })
 }
 
-#startDateDefault <- as.POSIXct("2016-01-01")
-startDateDefault <- "2016-01-01"
-
-
 # Server session logic
 shinyServer(function(input, output, session) {
 
-  shinyjs::disable("dateFrom")
-  
+  # ui state machine
+  shinyjs::disable("dateFrom") # temporary
+  shinyjs::hide("stocksNum")   # temporary
+  shinyjs::disable("go")
+
   # sesion data
   isMonthly <- reactiveVal(TRUE)
   startDate <- reactiveVal(NA)
@@ -121,6 +121,7 @@ shinyServer(function(input, output, session) {
   nStocks <- reactiveVal(3)
   freq <- reactiveVal(12)
   toPredict <- reactiveVal(12)
+  selectedStocks <- reactiveVal(NULL)
   
   # init ui
   init <- function(back, compression) {
@@ -145,9 +146,55 @@ shinyServer(function(input, output, session) {
     freq(input$freq)
     toPredict(input$predict)
     output$distPlot <- NULL
-    print("here")
   })
 
+  # will run on app start
+  observeEvent( input$refresh_helper, {
+    
+    # load Nasdaq symbols (once per user session) with modal progress
+    nt <- nasdaqTraded()
+    if (is.null(nt)) {
+      session$sendCustomMessage(type = 'launch-modal', "my-modal") 
+      shinyWidgets::updateProgressBar(session = session, id = "pb", value = 50,
+                                      title = "Loading Nasdaq Symbols")
+      nasdaqTraded(readNasdaqListings())
+      session$sendCustomMessage(type = 'remove-modal', "my-modal")
+    }
+    
+    output$m1 = renderText("\nPage under construction")
+    output$m2 = renderText("\nPage under construction")
+
+    shinyjs::enable("go")
+  })
+  
+  # fill the tab when stocks loaded
+  observe({
+    output$tbl2 = DT::renderDataTable(
+    nasdaqTraded(), 
+#    selection = 'single',
+    server = FALSE, 
+    options = list (
+      lengthChange=FALSE, 
+      pageLength=10)
+    )
+  })
+
+  # when stock selection changes
+  observe({
+    if (is.null(selectedStocks()) | length(selectedStocks()) == 0 ) {
+      shinyjs::disable("go")
+    } else {
+      output$distPlot <- NULL
+      shinyjs::enable("go")
+    }
+  })
+  
+  observe({
+    selectedStocks(nasdaqTraded()[input$tbl2_rows_selected,1])
+    output$msg2 = renderText(paste0(selectedStocks(),"; "))
+    print(paste("Stocks selected:",selectedStocks()))
+  })
+  
   # On "Run Forecast"
   observeEvent(input$go, {
     
@@ -155,29 +202,28 @@ shinyServer(function(input, output, session) {
     shinyWidgets::updateProgressBar(session = session, id = "pb", value = 0)
     session$sendCustomMessage(type = 'launch-modal', "my-modal") 
     
-    # load Nasdaq symbols (once per user session)
-    nt <- nasdaqTraded()
-    if (is.null(nt)) {
-      shinyWidgets::updateProgressBar(session = session, id = "pb", value = 5, title = "Loading Nasdaq Symbols")
-      nt = readNasdaqListings()
-      nasdaqTraded(nt)
-    }
-    
     # Load stock series data
-    stocks <- nt[sample(1:nrow(nt), nStocks()),]
+    nt <- nasdaqTraded()
+    
+    #stocks <- nt[sample(1:nrow(nt), nStocks()),]
+    stocks <- nt[selectedStocks(),]
+    nStocks(length(selectedStocks()))
+    
     z <- readStocks(stocks, input$dateFrom, quote(), isMonthly(), session)
     print(paste("Stocks loaded:", length(z), "out of", nStocks()))
 
     # Forecast and plot stock series
     output$distPlot <- renderPlot({
-      par(mfrow = c(nStocks(), 1))
+      par(mfrow = c(nStocks(), 1), mar=c(6,2,2,1))
       for (n in 1:length(z)) {
         plotForecast(z[[n]], names(z)[n], freq(), toPredict(), isMonthly())
       }
-    })
+    }, height = 500 + 100*(nStocks()-1), res=100)
     
     # close modal
     session$sendCustomMessage(type = 'remove-modal', "my-modal")
+
+    # switch to "Forecast" panel    
+    updateTabsetPanel(session, "tabPanels", selected = "forecastPanel")
   })  
-  
 })
