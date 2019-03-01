@@ -6,6 +6,7 @@ library(lubridate)
 library(zoo)
 library(lattice)
 library(DT)
+library(TSclust)
 
 # Reading list of Nasdaq - listed stock names ans clean it
 readNasdaqListings <- function() {

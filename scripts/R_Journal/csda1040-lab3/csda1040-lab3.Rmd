@@ -453,12 +453,13 @@ diss.PRED(interest.rates[, 13], interest.rates[, 16],
 ```
 
 Now lets prepare the correct differences and logarithms for all the countries involved
-in the dataset, then compute the distance at for the datase and printprediction dencities for all counties from the dataset (Fig. \ref{fig:fig18}). 
+in the dataset, then compute the distance at for the datase and printprediction densities for all counties from the dataset (Fig. \ref{fig:fig18}). 
 
 ```{r fig18, fig.width=5.5, fig.height=5, fig.cap="Grouping countries by prediction of interest rates"}
 diffs <- rep(1, ncol(interest.rates))
 logs <- rep(TRUE, ncol(interest.rates))
-
+str(interest.rates)
+class(interest.rates)
 set.seed(74)
 dpred <- diss(interest.rates, "PRED", h = 6, B = 1200, 
               logarithms = logs, differences = diffs,  plot = T)
@@ -631,6 +632,70 @@ plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE
   })
 }
 ```
+
+## Clustering of stock prices by prdiction
+
+Code below perform loading of stock time series as zoo multivariate series, in preparatiion for hierarchical clustering and plots the them in single plot (Fig. \ref{fig:fig24}):
+
+```{r fig24, fig.width=5.5, fig.height=4, fig.cap="Grouping stocks by prediction of rates"} 
+# function to read several stocks as one mts object
+readStocksAsSingleZoo <- function(stocksList, startDate, quote = "Close", isMonthly=TRUE) {
+  z <- NULL
+  compression <- if (isMonthly == TRUE) "m" else "d"
+  for (i in 1:nrow(stocksList)) {
+    name <- toString(stocksList[i, "Symbol"][1])
+    tryCatch({
+      tmp <- get.hist.quote(
+        instrument = name, 
+        quote = quote,
+        compression = compression,
+        start = startDate)
+      
+      colnames(tmp) <- name
+      if (is.null(z)) {
+        z <- tmp
+        str(z)
+      } else  {
+        z <- cbind(z,tmp)
+     }
+    },
+    error=function(cond) {
+      message(cond)      
+    })
+  }
+  return (z)
+}
+
+set.seed(11)
+nStocks <- 3
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
+z <- readStocksAsSingleZoo(stocks, "2018-01-01", "Close", FALSE)
+plot(z, plot.type="s", col=1:nStocks, xlab="")
+legend("topleft",legend=colnames(z), text.col=1:nStocks, bty='o')
+```
+
+Please note that stock have multiple NA values die to uneven starts and end and missing weekends values. In order to be used in clustering algoritms, those value should be filled/interpolated. Package  \CRANpkg{imputeTS} offers several algorithms like imputation with mean, median, linear interpolation, spline interpolation, kalman smoothing etc. For our purposes the best choice would be linear interpolation.
+
+The code below calculates distance matrix based on prediction algorithm from \CRANpkg{TSclust}, performs hierarchical clustering and plots the dendogram (Fig. \ref{fig:fig23}). Please note that as expected series EBMT and KINS are grouped together.
+
+```{r message=FALSE, warning=FALSE}
+library(imputeTS)
+tsStocks <- as.ts(z)
+tsStocks <- na.interpolation(tsStocks)
+#plot(tsStocks)
+diffs <- rep(1, ncol(tsStocks))
+logs <- rep(TRUE, ncol(tsStocks))
+
+set.seed(74)
+dpred <- diss(tsStocks, "PRED", h = 6, B = 1200, 
+              logarithms = logs, differences = diffs,  plot = FALSE)
+```
+
+```{r fig23, fig.width=5.5, fig.height=4, fig.cap="Grouping stocks by prediction of rates"} 
+hc.dpred <- hclust(dpred$dist)
+plot(hc.dpred, main = "", sub = "", xlab = "", ylab = "")
+```
+
 
 Let's test print forecast for the next 6 month of up to 5 random stocks (Fig. \ref{fig:fig21})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since 2016.
 

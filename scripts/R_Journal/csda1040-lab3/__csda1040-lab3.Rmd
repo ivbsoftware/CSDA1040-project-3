@@ -1,0 +1,323 @@
+---
+title: Time Series Analysis Methods and Applications
+author: 
+  - name          : "Igor Baranov"
+    affiliation   : "York University School of Continuing Studies"
+    email         : "https://learn.continue.yorku.ca/user/profile.php?id=21219"
+  - name          : "Michael Parravani"
+    affiliation   : "York University School of Continuing Studies"
+  - name          : "Ariana Biagi"
+    affiliation   : "York University School of Continuing Studies"
+  - name          : "Hui Fang Cai"
+    affiliation   : "York University School of Continuing Studies"
+abstract: >
+  The goal of this project is to discover Time Series analysis. We start with the data loading and creation of different types of object including ts, xts and zoo and proceed with data manipulation, conversion and visualization. Then we discover different algorithms of time series analysis like decomposition, forecasting and clustering. At the end we develop a practical example and build a Shiny application.
+output:
+  rticles::rjournal_article:
+    includes:
+      in_header: preamble.tex
+figsintext        : no
+---
+
+# Introduction
+
+Stock market data can be interesting to analyze and as a further incentive, strong predictive models can have large financial payoff. Here we use a dataset with historical stock prices (last 5 years) for all companies currently found on the S&P 500 index from Kaggle https://www.kaggle.com/camnugent/sandp500#all_stocks_5yr.csv to perform time series analysis. The goal of this analysis is to discover how the prices change over time for different type of stocks and predict for the prices for the future. We start with data loading and creation of different types of object including ts, xts, and zoo and proceed with data manipulation, conversion and visualization. Then, we discover different algorithms of time series analysis like decomposition, forecasting and clustering. At the end, we develop a practical example and build a Shiny application. This analysis might be used for some financial companies to develop investment plans on stocks to beat the market and make statistically informed trades, thus gain more profits.
+
+#Dataset
+The dataset contains 619040 obs x 7 variables with missing values. The variables are 
+
+Open - price of the stock at market open (this is NYSE data so all in USD)
+High - Highest price reached in the day
+Low Close - Lowest price reached in the day
+Volume - Number of shares traded
+Name - the stock's ticker name.
+
+when we do analysis, the missing values are removed and ignored. 
+
+
+## Background
+
+The function \strong{ts} for the core package \pkg{stats} \citep{R} is used to create time-series objects. These are vector or matrices with class of "ts" (and additional attributes) which represent data which has been sampled at equispaced points in time. In the matrix case, each column of the matrix data is assumed to contain a single (univariate) time series. Time series must have at least one observation, and although they need not be numeric there is very limited support for non-numeric series.
+
+An xts object from package \CRANpkg{xts} \citep{xts} extends the S3 class \strong{zoo} from the package of the same name \citep{zoo}. Package \CRANpkg{zoo} is the creator for an \strong{S3} class of indexed totally ordered observations which includes irregular time series.
+
+Similar to zoo objects, xts objects must have an ordered index. While zoo indexes cannot contain duplicate values, xts objects have optionally supported duplicate index elements since version 0.5-0. The xts class has one additional requirement, the index must be a time-based class. Currently supported classes include: 'Date', 'POSIXct', 'timeDate', as well as 'yearmon' and 'yearqtr' where the index values remain unique.
+
+## Ethical Consideration for the Time Series ML Framework
+As the goal of this report is only to research the time series methods, many aspects of the ethical ML framework do not directly apply. The time series data used here is open source and we can assume was collected in transparent ways. That being said, there is likely a large segment of the populace that can't take advantage of analysis presented in this report - we assume a low income population with limited access to internet and not STEM educated. If the outcome of this system were to be of more social impact, this would need to be use more appropriate datasets, analysis of which could be more advantageous to that population.
+
+\newpage
+# Time Series Data Manipulating and Visualizing
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+
+library("ggplot2")
+library("readr")
+library("dplyr")
+library("forcats")
+library(zoo)
+
+set.seed(777)
+```
+
+```{r eval=FALSE, include=FALSE}
+# Set directory to current script (works in R Studio only)
+this.dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(this.dir)
+```
+
+## Constructing TS object {#simpleTS}
+
+In the following example (Fig \ref{fig:fig4}) we construct and plot a simple TS class:
+
+```{r}
+simpleTS <- c(-50, 175, 149, 214, 247, 237, 225, 329, 729, 809,
+       530, 489, 540, 457, 195, 176, 337, 239, 128, 102, 232, 429, 3,
+       98, 43, -141, -77, -13, 125, 361, -45, 184)
+simpleTS <- ts(simpleTS, start = c(2001, 1), end = c(2008, 4), frequency = 4)
+print(simpleTS)
+```
+
+```{r fig4, fig.width=5.5, fig.cap="Time Series ts class Example Plot"}
+plot(simpleTS, ylab="", xlab="")
+```
+
+## Loading Stock Data  {#stocks5_aal}
+
+There are many ways to load times data, but the fastest is to use \CRANpkg{zoo} that has many convinient utilities to manipulate times series data. This is especially convinient when dealing with complex stock data.
+
+First we load the whole dataset as data frame:
+
+```{r}
+stocks5 <- read_csv(file="../../../data/all_stocks_5yr.csv.zip",col_names = TRUE)
+stocks5$Name <- as.factor(stocks5$Name)
+head(stocks5$Name)
+```
+
+As the name suggests we should have 500 (505 to be correct) stock names in the dataset. The code below extracts stock data of AAL (American Airlines Group Inc), converts it to \strong{zoo} object and plots it as multi-variate time series (Fig \ref{fig:fig5}).
+
+```{r}
+stocks5_aal <- stocks5[stocks5$Name=="AAL",c(1:6)]
+stocks5_aal <- zoo(stocks5_aal[,2:6], stocks5_aal$date)
+print(paste("Start date: ", start(stocks5_aal)))
+print(paste("Last date: ", end(stocks5_aal)))
+str(stocks5_aal)
+```
+
+
+```{r fig5, fig.width=5.5, fig.height=9, fig.cap="Multi-variate time series visualization of AAL stock"}
+plot(stocks5_aal, xlab = "", nc = 1, main = "")
+```
+
+## Additional time series data sets
+
+### Yahoo Science labeled time series
+Yahoo Science labeled time series is a big Synthetic and real time-series with labeled anomalies, it should be downloaded and used locally.
+[Yahoo Science labeled time series](https://github.com/ivbsoftware/CSDA1040-project-3/blob/master/data/orig/ydata-labeled-time-series-anomalies-v1_0.zip)
+
+### NAB Data Corpus
+[NAB Data Corpus](https://github.com/numenta/NAB/tree/master/data) is a large dataset of ordered, timestamped, single-valued metrics. All data files contain anomalies, unless otherwise noted. This data better be loaded from github directly to R script.
+
+
+```{r eval=FALSE, include=FALSE}
+tt1 <- read_csv(file="../../../data/NAB_data/realTraffic/TravelTime_387.csv",col_names = TRUE)
+
+require(xts)
+tt1_xts <- xts(tt1$value,tt1$timestamp)
+plot(tt1_xts)
+w <- tt1_xts[endpoints(tt1_xts, "days")]
+m <- decompose(ts(w, frequency = 7))
+plot(m$figure)
+plot(m)
+
+f <- decompose(apply.weekly(tt1_xts))s
+f$figure
+
+```
+
+# Time Series Methods Showcase
+
+## Time series decomposition
+Time series decomposition is to decompose a time series into trend, seasonal, cyclical and irregular components. 
+Frequency represents data which has been sampled at equispaced points in time:
+
+ - frequency=7: a weekly series
+ - frequency=12: a monthly series
+ - frequency=4: a quarterly series
+
+To decompose a time series into components:
+
+ - Trend component: long term trend
+ - Seasonal component: seasonal variation
+ - Cyclical component: repeated but non-periodic fluctuations
+ - Irregular component: the residuals
+
+A \strong{simpleTS} time series object was constructed in section [Constructing TS object](#simpleTS). It is used below as an example to demonstrate time series decomposition (Fig \ref{fig:fig6}). It was constructed to have quarterly data and will be decomposed with frequency 4.
+
+```{r fig6, fig.cap="Decomposition of cyclic object example", fig.width=5.5}
+m <- decompose(simpleTS)
+plot(m)
+```
+
+A more complex an realistic example of time series manipulation and decomposition presented below. We will use 'open' series of the object AAL stock taken directly from Yahoo Finance using \CRANpkg{quantmod} \citep{quantmod} package instead of data created in section [Loading Stock Data](#stocks5_aal). The full daily chart of this series presented on (Fig. \ref{fig:fig7}). To decompose the series, code below calculates yearly cycles of the last years since 2010, data aggregated monthly (Fig. \ref{fig:fig8}).
+
+
+```{r fig7, fig.cap="8 years of AAL 'open' series", fig.width=5.5}
+library(quantmod)
+
+tickers <- c('AAL')
+data <- new.env()
+getSymbols(tickers, src = 'yahoo', from = '2010-01-01', env = data)    
+last8 <- window(data$AAL$AAL.Open, start=as.Date("2010-01-01"), end=as.Date("2017-12-31"))
+plot(last8)
+```
+
+```{r fig8, fig.cap="Decomposition of 8 years AAL 'open' series", fig.width=5.5, fig.height=4}
+require(xts)
+last8_mo <- last8[endpoints(last8, "month")]
+m <- decompose(ts(last8_mo, frequency = 12))
+years <- seq(2010, 2020, 1)
+plot(m, xlab="", xaxt="n")
+axis(1, at=1:9, labels=years[1:9], pos = -6.6)
+```
+
+## Time series forecasting
+
+Time series forecasting is to forecast future events based on known past data. To forecast future events based on known past data For example, to predict the price of a stock based on its past performance. Popular models are:
+
+ - Autoregressive moving average (ARMA)
+ - Autoregressive integrated moving average (ARIMA)
+
+Example on Fig. \ref{fig:fig3} shows forecasting using ARIMA model.
+
+```{r fig3, fig.width=5.5, fig.cap="Cyclic Time Series Forecasting with ARIMA model", fig.height=4}
+ff <- ts(last8_mo)
+fit <- arima(ff, order=c(1,0,0), list(order=c(2,1,0), period=12))
+fore <- predict(fit, n.ahead=18)
+
+# error bounds at 95% confidence level
+U <- fore$pred + 2*fore$se
+L <- fore$pred - 2*fore$se
+
+ts.plot(ff, fore$pred, U, L, col=c(1,2,4,4), lty = c(1,1,2,2), 
+        xlab="", gpars = list(xaxt="n"))
+axis(1, at=seq(from=1, to=121, by=12), labels=years[1:11])
+legend("topleft", c("Actual", "Forecast", "Error Bounds (95% Confidence)"),
+       col=c(1,2,4), lty=c(1,1,2), cex=0.5)
+```
+
+## Time series forecasting with forecast package
+
+It is common practice to split the data into two parts, training and test data, where the training data is used to estimate any parameters of a forecasting method and the test data is used to evaluate its accuracy. To perform this task and also to test several additional forrecasting methods we used package \CRANpkg{forecast} \citep{forecast}.
+
+Code below creates train and test data from the the previously obtained 'open' stock data for the last 4 years aggregated monthly. Then it fits the train data using several models and plots the fitting results in the Fig.\ref{fig:fig10}. It also plots  the test portion in red for easy comparision of prediction and real data.
+
+```{r}
+library(forecast)
+
+# test data
+test_x <- window(last8_mo, start=as.Date("2016-12-20"))
+test_x <- ts(test_x, frequency = 12)
+str(test_x)
+
+#train data
+x <- window(last8_mo, end=as.Date("2016-12-31"))
+x <- ts(x, frequency = 12)
+str(x)
+```
+
+```{r}
+if(!file.exists("./models.Rds")) {
+  models <- list(
+    mod_arima = auto.arima(x, ic='aicc', stepwise=FALSE),
+    mod_exp = ets(x, ic='aicc', restrict=FALSE),
+    mod_neural = nnetar(x, p=12, size=25),
+    mod_tbats = tbats(x, ic='aicc', seasonal.periods=12),
+    mod_bats = bats(x, ic='aicc', seasonal.periods=12),
+    mod_stl = stlm(x, s.window=12, ic='aicc', robust=TRUE, method='ets'),
+    mod_sts = StructTS(x)
+    )
+  saveRDS(models, file = "./models.Rds")
+} else  {
+  models <- readRDS("./models.Rds")
+}
+```
+
+```{r fig10, fig.height=9, fig.width=6, fig.cap="AAL stock prediction vs reality using different forecasting methods"}
+forecasts <- lapply(models, forecast, 12)
+forecasts$naive <- naive(x, 12)
+par(mfrow=c(4, 2))
+for(f in forecasts){
+  plot(f, xlab="", xaxt="n")
+  lines(y=test_x[1:13], x=seq(from=(8-1/12), to=9, by=1/12)[1:13], col='red')
+  axis(1, at=1:10, labels=years[1:10])
+}
+```
+
+## Evaluating forecast accuracy
+Because the test data is not used in determining the forecasts, it should provide a reliable indication of how well the model is likely to forecast on new data. he metrics used below are described in \citep{hyndman_forecasting:_2014}, also available online [here](https://otexts.com/fpp2/accuracy.html). The metrics are:
+
+ - ME - Mean absolute error
+ - RMSE - Root mean squared error
+ - MAE - mean absolute erro
+ - MPE - mean percentage error
+ - MAPE - Mean absolute percentage error
+ - MASE - mean absolute scaled error
+ - Theil's U - Uncertainty coefficient
+
+Code below (adaptation of [Timeseries analysis procedure and methods using R](https://stats.stackexchange.com/questions/140163/timeseries-analysis-procedure-and-methods-using-r)) calculates common forecast errors of the predictions made in the previous section.
+ 
+```{r}
+test_xx <- ts(test_x[2:13], start=c(8,1), frequency = 12)
+acc <- lapply(forecasts, function(f){
+  accuracy(f, test_xx)[2,,drop=FALSE]
+})
+acc <- Reduce(rbind, acc)
+row.names(acc) <- names(forecasts)
+acc <- acc[order(acc[,'MASE']),]
+round(acc, 2)
+```
+
+## Time series clustering
+Time series clustering partitioning time series data into groups based on similarity or distance, so that time series in the same cluster are similar. For time series clustering with R, the first step is to work out an appropriate distance/similarity metric, and then, at the second step, use existing clustering techniques, such as k-means, hierarchical clustering, density-based clustering or subspace clustering, to find clustering structures.
+
+Dynamic Time Warping (DTW) finds optimal alignment between two time series, and DTW distance is used as a distance metric in the example below.
+
+Measure of distance/dissimilarity
+ - Euclidean distance
+ - Manhattan distance
+ - Maximum norm
+ - Hamming distance
+ - The angle between two vectors (inner product)
+ - Dynamic Time Warping (DTW) distance
+
+
+
+\newpage
+# Example of Time-Series Analysis Practical Application 
+
+## Prepare Shiny App for Deployment
+
+## Saving recommender data objects
+```{r message=FALSE, warning=FALSE}
+#saveRDS(rcmnd_ub, file = "jokeRecommender.Rds")
+#saveRDS(jokes, file = "jokes.Rds")
+```
+
+# Deployment Discussion
+
+This model is currently not of much use given its accuracy but it will serve as a proof of concept. This model could be used to help writers of movies/tv shows write jokes appropriate for a specific or large audience. 
+
+More data should be collected from this userbase to fill a training dataset. The dataset in its current state is quite sparse. The data would need to be updated every 3-5 years as people's taste changes and people within certian age groups mature. The Shiny app developed would be a deployment method to collect more data. 
+
+Further analysis could be done (with the appropriate data) to see how similar taste in humor is related to age.
+
+The model developed in this project was used to create Shiny application currently deployed at [ivbsoftware.shinyapps.io/JokeRecommender/](https://ivbsoftware.shinyapps.io/TimeSeries1/). Code of the application could be found in [Github](https://github.com/ivbsoftware/CSDA1040-project-3/tree/master/shiny/).
+
+\bibliography{RJreferences}
+
+\newpage
+
+# Note from the Authors
+
+This file was generated using [_The R Journal_ style article template](https://github.com/rstudio/rticles), additional information on how to prepare articles for submission is here - [Instructions for Authors](https://journal.r-project.org/share/author-guide.pdf). The article itself is an executable R Markdown file that could be [downloaded from Github](https://github.com/ivbsoftware/CSDA1040-project-1/tree/master/scripts/R_Journal/csda1040-lab1) with all the necessary artifacts.
