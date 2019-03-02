@@ -701,8 +701,53 @@ Let's test print forecast for the next 6 month of up to 5 random stocks (Fig. \r
 
 ```{r fig21, fig.height=9, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of monthly stock prices"}
 
+plotForecast2 <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE) {
+  x <- ts(stockZoo, frequency=freq)
+  dmin <- start(stockZoo)
+  print(dmin)
+  dmax <- end(stockZoo)
+  
+  tryCatch({
+    models <- list(
+      mod_stl = stlm(x, s.window=freq, ic='aicc', robust=TRUE, method='ets')
+    )
+  
+    forecasts <- lapply(models, forecast, toForecast)
+    len <- ceiling(1 + length(x)/freq) 
+    format <- if (isMonthly) "%b-%Y" else "%Y-%m-%d"
+    by <- if (isMonthly) paste(freq, "months") else paste(freq, "days")
+    to <- if (isMonthly) as.Date(dmax)+toForecast*30 else as.Date(dmax)+toForecast
+    las <- if (isMonthly) 1 else 2
+    for (f in forecasts) {
+      ticks<-format(seq(as.Date(dmin),to=to, length.out=len), format=format)
+      print (ticks)
+      plot(f, xlab="", xaxt="n", main = paste(stockSymbol, "Stock Forecast"))
+      axis(1, at=1:len, labels=ticks, par(las=las))
+    }
+  },
+  error=function(cond) {
+    message(cond)      
+  })
+}
+
 set.seed(99)
-nStocks <- 5
+nStocks <- 3
+stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
+
+z <- readStocksAsSingleZoo(stocks, "2010-01-01", "Close", TRUE)
+par(mfrow = c(ncol(z), 1))
+for (n in 1:ncol(z)) {
+  plotForecast2(z[,n], colnames(z)[n], 12, 12)
+}
+```
+
+
+Let's test print forecast for the next 6 month of up to 5 random stocks (Fig. \ref{fig:fig21})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since 2016.
+
+```{r fig21, fig.height=9, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of monthly stock prices"}
+
+set.seed(99)
+nStocks <- 3
 stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
 
 z <- readStocks(stocks, "2010-01-01", "Close", TRUE)

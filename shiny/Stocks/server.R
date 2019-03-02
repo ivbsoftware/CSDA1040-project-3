@@ -7,6 +7,7 @@ library(zoo)
 library(lattice)
 library(DT)
 library(TSclust)
+library(imputeTS)
 
 # Reading list of Nasdaq - listed stock names ans clean it
 readNasdaqListings <- function() {
@@ -32,57 +33,60 @@ readNasdaqListings <- function() {
 }
 
 # Read stocks from Yahoo
-readStocks <- function(stocksList, startDate, quote = "Close", isMonthly=TRUE, session) {
-  print("Entering readStocks")
-  z <- list()
+readStocksAsSingleZoo <- 
+  function(stocksList, startDate, quote = "Close", isMonthly=TRUE, session) 
+{
+  z <- NULL
   compression <- if (isMonthly == TRUE) "m" else "d"
   len <- nrow(stocksList)
   for (i in 1:len) {
     name <- toString(stocksList[i, "Symbol"][1])
-    
+
     shinyWidgets::updateProgressBar(session = session, id = "pb", 
-                                    value = 100.0*i/len,
+                                    value = 80.0*i/len,
                                     title = paste("Loading",name))
     
     tryCatch({
-      z[[name]] <- get.hist.quote(
+      tmp <- get.hist.quote(
         instrument = name, 
         quote = quote,
         compression = compression,
         start = startDate)
+      
+      colnames(tmp) <- name
+      if (is.null(z)) {
+        z <- tmp
+        str(z)
+      } else  {
+        z <- cbind(z,tmp)
+      }
     },
     error=function(cond) {
       message(cond)      
-    },
-    warning=function(cond) {
-      message(cond)      
     })
   }
-  print("Exiting readStocks")
   return (z)
 }
 
-plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE) {
+plotForecast2 <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE) {
+  x <- ts(stockZoo, frequency=freq)
   tryCatch({
+    x <- ts(stockZoo, frequency=freq)
+  }, error=function(cond) {
+    stop(": not enough data")
+  })
 
-    tryCatch({
-      x <- ts(stockZoo, frequency=freq)
-    }, error=function(cond) {
-      stop(": not enough data")
-    })
+  dmin <- start(stockZoo)
+  dmax <- end(stockZoo)
 
-    # print dates
-    dmin <- start(stockZoo)
-    dmax <- end(stockZoo)
-    print(paste(stockSymbol, ": dmin=", dmin, "dmax=", dmax))
-    
+  tryCatch({
     models <- list(
       mod_stl = stlm(x, s.window=freq, ic='aicc', robust=TRUE, method='ets')
     )
     
     forecasts <- lapply(models, forecast, toForecast)
     len <- ceiling(1 + length(x)/freq) 
-    format <- if (isMonthly) "%b-%Y" else " %Y-%m-%d"
+    format <- if (isMonthly) "%b-%Y" else "%Y-%m-%d"
     by <- if (isMonthly) paste(freq, "months") else paste(freq, "days")
     to <- if (isMonthly) as.Date(dmax)+toForecast*30 else as.Date(dmax)+toForecast
     las <- if (isMonthly) 1 else 2
@@ -106,9 +110,18 @@ plotForecast <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRUE
   })
 }
 
+
 # Server session logic
 shinyServer(function(input, output, session) {
-
+  cleanUI <- function(){
+    output$distPlot <- NULL
+    output$compPlot <- NULL
+    output$clustPlot <- NULL
+    hideTab(inputId = "tabPanels", target = "compPanel")
+    hideTab(inputId = "tabPanels", target = "forecastPanel")
+    hideTab(inputId = "tabPanels", target = "clustPanel")
+  }
+  
   # ui state machine
   shinyjs::disable("dateFrom") # temporary
   shinyjs::hide("stocksNum")   # temporary
@@ -135,7 +148,10 @@ shinyServer(function(input, output, session) {
       updateSliderInput(session, "back", min = -12, max = -2, value = back, label = "Month Back")  
     }
     updateDateInput(session, "dateFrom", value=startDate())
-    output$distPlot <- NULL
+    #output$distPlot <- NULL
+    #output$compPlot <- NULL
+    #output$clustPlot <- NULL
+    cleanUI()
   }  
   
   observe({
@@ -146,7 +162,10 @@ shinyServer(function(input, output, session) {
     nStocks(input$stocksNum)
     freq(input$freq)
     toPredict(input$predict)
-    output$distPlot <- NULL
+    #output$distPlot <- NULL
+    #output$compPlot <- NULL
+    #output$clustPlot <- NULL
+    cleanUI()
   })
 
   # will run on app start
@@ -162,10 +181,8 @@ shinyServer(function(input, output, session) {
       session$sendCustomMessage(type = 'remove-modal', "my-modal")
     }
     
-    output$m1 = renderText("\nPage under construction")
-    output$m2 = renderText("\nPage under construction")
-
     shinyjs::enable("go")
+    hideTab(inputId = "tabPanels", target = "clustPanel")
   })
   
   # fill the tab when stocks loaded
@@ -186,6 +203,9 @@ shinyServer(function(input, output, session) {
       shinyjs::disable("go")
     } else {
       output$distPlot <- NULL
+      output$compPlot <- NULL
+      output$clustPlot <- NULL
+      cleanUI()
       shinyjs::enable("go")
     }
   })
@@ -206,25 +226,65 @@ shinyServer(function(input, output, session) {
     # Load stock series data
     nt <- nasdaqTraded()
     
-    #stocks <- nt[sample(1:nrow(nt), nStocks()),]
     stocks <- nt[selectedStocks(),]
     nStocks(length(selectedStocks()))
     
-    z <- readStocks(stocks, input$dateFrom, quote(), isMonthly(), session)
-    print(paste("Stocks loaded:", length(z), "out of", nStocks()))
+    z <- readStocksAsSingleZoo(stocks, input$dateFrom, quote(), isMonthly(), session)
+    print(paste("Stocks loaded:", ncol(z), "out of", nStocks()))
 
+    # Plot stock series (single plot)
+    showTab(inputId = "tabPanels", target = "compPanel")
+    output$compPlot <- renderPlot({
+      plot(z, plot.type="s", col=1:ncol(z), xlab="", ylab="")
+      legend("topleft",legend=colnames(z), text.col=1:ncol(z), bty='o')
+    }, height = 600, res=100)
+    
     # Forecast and plot stock series
+    showTab(inputId = "tabPanels", target = "forecastPanel")
     output$distPlot <- renderPlot({
-      par(mfrow = c(nStocks(), 1), mar=c(6,2,2,1))
-      for (n in 1:length(z)) {
-        plotForecast(z[[n]], names(z)[n], freq(), toPredict(), isMonthly())
+      par(mfrow = c(ncol(z), 1), mar=c(6,3,2,2))
+      for (n in 1:ncol(z)) {
+        plotForecast2(z[,n], colnames(z)[n], freq(), toPredict(), isMonthly())
       }
     }, height = 500 + 100*(nStocks()-1), res=100)
     
-    # close modal
+    # Culculate and plot clusters
+    
+    shinyWidgets::updateProgressBar(session = session, id = "pb", 
+                                    value = 80,
+                                    title = "Analyzing...")
+
+    if (ncol(z) > 2) {
+      tsStocks <- as.ts(z)
+      tsStocks <- na.interpolation(tsStocks)
+      diffs <- rep(1, ncol(tsStocks))
+      logs <- rep(TRUE, ncol(tsStocks))
+      set.seed(74)
+      if (FALSE) {
+        dpred <- diss(tsStocks, "PRED", h = 6, B = 1200, logarithms = logs, differences = diffs,  plot = FALSE)    
+        output$clustPlot <- renderPlot({
+          hc.dpred <- hclust(dpred$dist)
+          plot(hc.dpred, main = "", sub = "", xlab = "", ylab = "")
+        })
+      } else {
+        IP.dis <- diss(tsStocks, "CORT")
+        output$clustPlot <- renderPlot({
+          clust <- hclust(IP.dis)
+          plot(clust, main = "", sub = "", xlab = "", ylab = "")
+        })
+      }
+    
+      showTab(inputId = "tabPanels", target = "clustPanel")
+
+    } else {
+      output$clustPlot <- NULL
+      hideTab(inputId = "tabPanels", target = "clustPanel")
+    }
+    
+    # Close modal
     session$sendCustomMessage(type = 'remove-modal', "my-modal")
 
-    # switch to "Forecast" panel    
-    updateTabsetPanel(session, "tabPanels", selected = "forecastPanel")
+    # Switch to "Forecast" panel    
+    updateTabsetPanel(session, "tabPanels", selected = "compPanel")
   })  
 })

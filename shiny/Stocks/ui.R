@@ -41,7 +41,7 @@ shinyUI(fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      actionButton("go", "Run Forecast", width = "100%", class="btn btn-primary"),
+      actionButton("go", "Analyze", width = "100%", class="btn btn-primary"),
       hr(),              
       dateInput(inputId="dateFrom", label = "From", format = "yyyy-mm-dd", width = "100%", value = NA),
       sliderInput("back", min=-100, max=-1, value=-3, label=""),
@@ -68,9 +68,9 @@ shinyUI(fluidPage(
                  p(), 
                  DT::dataTableOutput('tbl2')
         ),
+        tabPanel("Comparision", value="compPanel", plotOutput("compPlot")),
         tabPanel("Forecast", value="forecastPanel", plotOutput("distPlot")),
-        tabPanel("Decomposition", value="decomptPanel", span(textOutput("m1"), style="color:red")),
-        tabPanel("Comparision", value="compPanel", span(textOutput("m2"), style="color:red"))      
+        tabPanel("Clusters", value="clustPanel", plotOutput("clustPlot"))
       )
     )
   )
