@@ -3,6 +3,7 @@ library(shinythemes)
 library(shinyjs)
 library(shinyWidgets)
 library(shinyBS)
+library(RLumShiny)
 
 ## UI extensions
 jscode <- "
@@ -42,21 +43,18 @@ shinyUI(fluidPage(
   sidebarLayout(
     sidebarPanel(
       actionButton("go", "Analyze", width = "100%", class="btn btn-primary"),
-      hr(),              
-      dateInput(inputId="dateFrom", label = "From", format = "yyyy-mm-dd", width = "100%", value = NA),
+      p(),              
+      actionButton("reset", "Reset", width = "100%", class="btn btn-warning"),
+      p(),              
+      dateInput(inputId="dateFrom", label = "From:", format = "yyyy-mm-dd", width = "100%", value = NA),
       sliderInput("back", min=-100, max=-1, value=-3, label=""),
-      radioButtons("compression", "Aggregate Data:",
-                   c("Monthly" = "m","Daily" = "d")),
+      radioButtons("compression", "Aggregate Data:", c("Monthly" = "m","Daily" = "d"), inline = TRUE),
       sliderInput("stocksNum", min=1, max=5, value=1, label="Stocks to Load"),
-      sliderInput("freq", min=6, max=24, value=12, label="Window"),
-      sliderInput("predict", min=6, max=24, value=12, label="To Predict"),
-      # for potencial use as modal dialog
-      # bsModal("modalExample", "Nasdaq Listed Stocks", "selectStocks", 
-      #         size = "large", 
-      #         verbatimTextOutput('msg'),
-      #         p(),
-      #         DT::dataTableOutput('tbl')
-      #       ),
+      sliderInput("freq", min=6, max=24, value=12, label="Window:"),
+      sliderInput("predict", min=6, max=24, value=12, label="Predict:"),
+      selectInput("clustm", "Clustering distance method:", 
+                  choices=c("Proximity & behaviour"="CORT", "Prediction based"="PRED")),
+      tooltip("clustm", "Select method of TS distance calculation - CORT or PRED."),
       hidden(numericInput(inputId='refresh_helper', value=0, label=NULL)) # on app start trigger
     ),
 

@@ -101,7 +101,6 @@ plotForecast2 <- function(stockZoo, stockSymbol, freq, toForecast, isMonthly=TRU
     plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
     text(x = 0.5, y = 0.5, paste("Can't forecast",stockSymbol, ":", cond$message), cex = 1.6, col = "red")    
     print (cond)
-    str(cond)
   },
   warning=function(cond) {
     plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
@@ -148,9 +147,6 @@ shinyServer(function(input, output, session) {
       updateSliderInput(session, "back", min = -12, max = -2, value = back, label = "Month Back")  
     }
     updateDateInput(session, "dateFrom", value=startDate())
-    #output$distPlot <- NULL
-    #output$compPlot <- NULL
-    #output$clustPlot <- NULL
     cleanUI()
   }  
   
@@ -159,12 +155,10 @@ shinyServer(function(input, output, session) {
   })
   
   observe({
+    input$clustm
     nStocks(input$stocksNum)
     freq(input$freq)
     toPredict(input$predict)
-    #output$distPlot <- NULL
-    #output$compPlot <- NULL
-    #output$clustPlot <- NULL
     cleanUI()
   })
 
@@ -184,36 +178,45 @@ shinyServer(function(input, output, session) {
     shinyjs::enable("go")
     hideTab(inputId = "tabPanels", target = "clustPanel")
   })
+
   
+  fillStockTable <- function() {
+    output$tbl2 = DT::renderDataTable(
+      nasdaqTraded(), 
+      #    selection = 'single',
+      server = FALSE, 
+      options = list (
+        lengthChange=FALSE, 
+        pageLength=10)
+    )
+    output$msg2 <- NULL
+    cleanUI()
+  }
+  
+  observeEvent(input$reset, {
+    fillStockTable()
+  })
+
   # fill the tab when stocks loaded
   observe({
-    output$tbl2 = DT::renderDataTable(
-    nasdaqTraded(), 
-#    selection = 'single',
-    server = FALSE, 
-    options = list (
-      lengthChange=FALSE, 
-      pageLength=10)
-    )
+    fillStockTable()
   })
 
   # when stock selection changes
   observe({
     if (is.null(selectedStocks()) | length(selectedStocks()) == 0 ) {
       shinyjs::disable("go")
+      shinyjs::disable("reset")
     } else {
-      output$distPlot <- NULL
-      output$compPlot <- NULL
-      output$clustPlot <- NULL
       cleanUI()
       shinyjs::enable("go")
+      shinyjs::enable("reset")
     }
   })
   
   observe({
     selectedStocks(nasdaqTraded()[input$tbl2_rows_selected,1])
     output$msg2 = renderText(paste0(selectedStocks(),"; "))
-    print(paste("Stocks selected:",selectedStocks()))
   })
   
   # On "Run Forecast"
@@ -260,22 +263,32 @@ shinyServer(function(input, output, session) {
       diffs <- rep(1, ncol(tsStocks))
       logs <- rep(TRUE, ncol(tsStocks))
       set.seed(74)
-      if (FALSE) {
-        dpred <- diss(tsStocks, "PRED", h = 6, B = 1200, logarithms = logs, differences = diffs,  plot = FALSE)    
+      tryCatch({
+        if (input$clustm == "PRED") {
+          dpred <- diss(tsStocks, "PRED", h = 6, B = 1200, logarithms = logs, differences = diffs,  plot = FALSE)    
+          output$clustPlot <- renderPlot({
+            hc.dpred <- hclust(dpred$dist)
+            plot(hc.dpred, main = "", sub = "", xlab = "", ylab = "")
+          })
+        } else {
+          IP.dis <- diss(tsStocks, "CORT")
+          output$clustPlot <- renderPlot({
+            clust <- hclust(IP.dis)
+            plot(clust, main = "", sub = "", xlab = "", ylab = "")
+          })
+        }
+        showTab(inputId = "tabPanels", target = "clustPanel")
+      },
+      error=function(cond) {
         output$clustPlot <- renderPlot({
-          hc.dpred <- hclust(dpred$dist)
-          plot(hc.dpred, main = "", sub = "", xlab = "", ylab = "")
+          plot(c(0, 1), c(0, 1), ann = F, bty = 'n', type = 'n', xaxt = 'n', yaxt = 'n')
+          text(x = 0.5, y = 0.5, 
+               paste0("Clustefirg failed due to data,\ntry different time window, stock series or distance algorithm.",
+                      "\nOriginal error message:\n[",cond$message, "]"), col = "red")    
         })
-      } else {
-        IP.dis <- diss(tsStocks, "CORT")
-        output$clustPlot <- renderPlot({
-          clust <- hclust(IP.dis)
-          plot(clust, main = "", sub = "", xlab = "", ylab = "")
-        })
-      }
-    
-      showTab(inputId = "tabPanels", target = "clustPanel")
-
+        showTab(inputId = "tabPanels", target = "clustPanel")
+      })
+      
     } else {
       output$clustPlot <- NULL
       hideTab(inputId = "tabPanels", target = "clustPanel")
