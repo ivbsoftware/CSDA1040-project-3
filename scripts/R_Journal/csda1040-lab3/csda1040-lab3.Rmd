@@ -742,22 +742,6 @@ for (n in 1:ncol(z)) {
 ```
 
 
-Let's test print forecast for the next 6 month of up to 5 random stocks (Fig. \ref{fig:fig21})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since 2016.
-
-```{r fig21, fig.height=9, fig.width=5.5, message=FALSE, warning=FALSE, fig.cap="Prediction of monthly stock prices"}
-
-set.seed(99)
-nStocks <- 3
-stocks <- nasdaqTraded[sample(1:nrow(nasdaqTraded), nStocks),]
-
-z <- readStocks(stocks, "2010-01-01", "Close", TRUE)
-
-par(mfrow = c(nStocks, 1))
-for (n in 1:length(z)) {
-  plotForecast(z[[n]], names(z)[n], 12, 12)
-}
-```
-
 
 Now let's test print forecast for the next 2 weeks of up to 5 random stocks (Fig. \ref{fig:fig22})). Some of the stocks might be not available and some could not be predicted by the method of choice, so the final resultmight have less than 5 charts. The stock data aggregated monthly and requested since beginning of 2018.
 
